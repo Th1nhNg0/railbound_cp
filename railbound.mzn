@@ -409,14 +409,25 @@ constraint forall(r in 1..H, c in 1..W) (
   endif
 );
 
+function int: manhattan(int: r1,int: c1,int: r2,int: c2) =
+  abs(r1-r2) + abs(c1-c2);
+
+constraint forall(t in 1..N_TRAINS) (
+  arrival_time[t] >= manhattan(START_R[t], START_C[t], TARGET_R, TARGET_C)
+);
 
 % ========= SOLVE & OUTPUT ===================================
+% --- Makespan objective: minimize the latest arrival time ---
+var 0..MAX_TIME: T;
+constraint T = max([arrival_time[t] | t in 1..N_TRAINS]);
 
-solve satisfy;
+solve minimize T;
 
+% solve satisfy;
 output [
   "GRID LAYOUT:\n",
   show2d(grid), "\n\n",
+  "MAKESPAN: ", show(T), "\n",
   "TRAIN PATHS:\n"
 ]
 ++
