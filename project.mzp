@@ -1,0 +1,23 @@
+{
+    "openFiles": [
+        "railbound.mzn"
+    ],
+    "openTab": 0,
+    "projectFiles": [
+        "railbound.mzn",
+        "test/1-11A.dzn",
+        "test/1-11B.dzn",
+        "test/1-12.dzn",
+        "test/1-12A.dzn",
+        "test/1-13.dzn",
+        "test/1-13A.dzn",
+        "test/1-14A.dzn",
+        "test/1-15A.dzn",
+        "test/1-3.dzn",
+        "test/1-9.dzn",
+        "test/easy.dzn"
+    ],
+    "selectedBuiltinConfigId": "org.chuffed.chuffed",
+    "selectedBuiltinConfigVersion": "0.13.2",
+    "version": 106
+}
