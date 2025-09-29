@@ -417,16 +417,14 @@ constraint forall(t in 1..N_TRAINS) (
 );
 
 % ========= SOLVE & OUTPUT ===================================
-% --- Makespan objective: minimize the latest arrival time ---
-var 0..MAX_TIME: T = max([arrival_time[t] | t in 1..N_TRAINS]);
-solve minimize T;
+
+solve satisfy;
 
 
 % solve satisfy;
 output [
   "GRID LAYOUT:\n",
   show2d(grid), "\n\n",
-  "MAKESPAN: ", show(T), "\n",
   "TRAIN PATHS:\n"
 ]
 ++
