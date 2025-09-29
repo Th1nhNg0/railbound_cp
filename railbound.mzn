@@ -1,19 +1,13 @@
 % ============================================================
-% Train Routing CSP — readable, commented version
-% ------------------------------------------------------------
-% Goal:
-%   Place track pieces on an H×W grid so N_TRAINS move from their
-%   given starts to a single target cell, one after another,
-%   without collisions, under a track piece budget.
+% Train Routing CSP
+% ============================================================
+% Place track pieces on H×W grid for N trains to reach target sequentially,
+% without collisions, under track budget.
 %
-% Coordinate & direction conventions:
-%   - Rows increase downward: TOP = -row, DOWN = +row
-%   - Cols increase to the right: LEFT = -col, RIGHT = +col
-%   - 'train_dir[t,time]' is the ENTRY direction into the cell
-%     occupied at (t,time). For time=1, the entry direction is
-%     determined by the first move from the start cell.
-%   - 'START_DIR[t]' is the EXIT direction from the start cell
-%     for the very first move (time 0 -> 1).
+% Conventions:
+% - Rows: 1..H (top to bottom), Cols: 1..W (left to right)
+% - train_dir[t,time]: entry direction into cell at (t,time)
+% - START_DIR[t]: exit direction from start for first move
 % ============================================================
 
 
@@ -68,15 +62,9 @@ enum Piece = {
   CORNER_DR,    % ┌ connects DOWN <-> RIGHT
   CORNER_DL,    % ┐ connects DOWN <-> LEFT
 
-  % Switches: SWITCH_<SingleEnd>_<StraightEnd>_<CurveEnd>
-  % Example: SWITCH_T_D_R means:
-  %   - enter from TOP   → exit to DOWN   (Single → Straight)
-  %   - enter from DOWN  → exit to RIGHT  (Straight → Curve)
-  %   - enter from RIGHT → exit to DOWN   (Curve → Straight)
-  % General rule:
-  %   enter from Single  → exit to Straight
-  %   enter from Straight→ exit to Curve
-  %   enter from Curve   → exit to Straight
+  % Switches: SWITCH_<Single>_<Straight>_<Curve>
+  % Rule: Single->Straight, Straight->Curve, Curve->Straight
+  % E.g., SWITCH_T_D_R: TOP->DOWN, DOWN->RIGHT, RIGHT->DOWN
 
   SWITCH_T_D_R,
   SWITCH_T_D_L,
@@ -254,27 +242,19 @@ constraint forall(t in 1..N_TRAINS) (
 );
 
 
-% --- 2) Move constraint
-% --- 2A. First move (time 0 -> 1) using START_DIR as exit ---
+% --- 2) Movement constraints ---
 constraint forall(t in 1..N_TRAINS) (
   let {
-    int: r0 = START_R[t];
-    int: c0 = START_C[t];
-    Dir: exit0 = START_DIR[t];
-    var 1..H: r1 = r0 + dr[exit0];
-    var 1..W: c1 = c0 + dc[exit0];
-    var Piece: p0 = grid[r0, c0];
-    var Piece: p1 = grid[r1, c1];
+    int: r0 = START_R[t]; int: c0 = START_C[t]; Dir: exit0 = START_DIR[t];
+    var 1..H: r1 = r0 + dr[exit0]; var 1..W: c1 = c0 + dc[exit0];
+    var Piece: p0 = grid[r0, c0]; var Piece: p1 = grid[r1, c1];
   } in
-    train_row[t, 1] = r1
- /\ train_col[t, 1] = c1
- /\ train_dir[t, 1] = opposite[exit0]          % entry into the next cell
- /\ can_exit[p0, exit0]                        % start piece can exit that side
- /\ can_enter[p1, opposite[exit0]]             % next piece accepts that entry
+    train_row[t, 1] = r1 /\ train_col[t, 1] = c1 /\ train_dir[t, 1] = opposite[exit0]
+ /\ can_exit[p0, exit0] /\ can_enter[p1, opposite[exit0]]
 );
 
 
-% --- 2B. Subsequent moves (time >= 1) ---
+% --- Subsequent moves (time >= 1) ---
 constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
   let {
     var 1..H: r = train_row[t, time];
@@ -289,25 +269,18 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
   } in
 
   if r == TARGET_R /\ c == TARGET_C then
-    % Freeze at target
+    % Stay at target
     (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
   else
-    % Local mapping + neighbor acceptance
-    can_enter[piece, entry_dir]
- /\ exit_dir = exit_of[piece, entry_dir]
- /\ next_r = r + dr[exit_dir]
- /\ next_c = c + dc[exit_dir]
- /\ next_entry_dir = opposite[exit_dir]
- /\ let { var Piece: next_p = grid[next_r, next_c] } in can_enter[next_p, next_entry_dir]
+    % Move via piece routing
+    can_enter[piece, entry_dir] /\ exit_dir = exit_of[piece, entry_dir]
+ /\ next_r = r + dr[exit_dir] /\ next_c = c + dc[exit_dir] /\ next_entry_dir = opposite[exit_dir]
+ /\ can_enter[grid[next_r, next_c], next_entry_dir]
   endif
 );
 
 
-% --- 3) Arrival & ordering:
-% A train is considered "arrived" at all times >= its arrival_time,
-% and must be at the target from that time onward. This forces the
-% path to stay at the target (no leaving). Also, enforce trains
-% arrive strictly in order: t arrives before t+1.
+% --- 3) Arrival ordering: trains arrive sequentially, stay at target ---
 constraint forall(t in 1..N_TRAINS)(
   forall(time in 0..MAX_TIME) (
     (train_row[t, time] = TARGET_R /\ train_col[t, time] = TARGET_C)
@@ -322,11 +295,7 @@ constraint forall(t in 1..N_TRAINS-1) (
 
 
 
-% --- 4) Collision avoidance:
-% No two trains may occupy the same (row,col) at the same time,
-% except that the target cell is allowed to hold multiple trains
-% over time (since arrivals "park" there). The disjunction below
-% allows equality only if it's the target cell.
+% --- 4) Collision avoidance: no two trains at same cell except target ---
 constraint forall(time in 0..MAX_TIME, t1 in 1..N_TRAINS, t2 in t1+1..N_TRAINS) (
   let {
     var 1..H: r1 = train_row[t1, time];
@@ -337,9 +306,7 @@ constraint forall(time in 0..MAX_TIME, t1 in 1..N_TRAINS, t2 in t1+1..N_TRAINS) 
   (r1, c1) != (r2, c2) \/ (r1 = TARGET_R /\ c1 = TARGET_C)
 );
 
-% Forbid two trains from swapping positions between consecutive timesteps,
-% except when at least one of the trains is at the target (where "parking"
-% is allowed).
+% Prevent position swaps between timesteps, except at target.
 constraint forall(time in 0..MAX_TIME-1, t1 in 1..N_TRAINS, t2 in t1+1..N_TRAINS) (
   let {
     var 1..H: r1t = train_row[t1, time];
@@ -372,9 +339,7 @@ constraint forall(p in INIT_POS) (
 
 
 
-% --- 6) Track budget:
-% Count total non-EMPTY pieces placed, subtract the number of
-% non-EMPTY pre-placed pieces, and cap by MAX_TRACKS.
+% --- 6) Track budget: limit non-EMPTY pieces beyond pre-placed ---
 constraint
   let {
     var int: total_placed_tracks = sum(p in grid where p != EMPTY)(1);
@@ -384,22 +349,15 @@ constraint
 ;
 
 
-% --- 7) Piece validity / connectivity rules ---
-% STRAIGHT: allowed to have open ends (no requirements).
-% CORNER & SWITCH: every connection side must be connected to a non-EMPTY neighbor
-% that can be entered from the opposite direction. Off-grid counts as invalid.
+% --- 7) Connectivity: corners/switches must connect to valid neighbors ---
 predicate in_bounds(int: r, int: c) = r >= 1 /\ r <= H /\ c >= 1 /\ c <= W;
 constraint forall(r in 1..H, c in 1..W) (
   let { var Piece: p = grid[r,c] } in
-  if (p in CORNERS) \/ (p in SWITCHES) then
+  if p in CORNERS \/ p in SWITCHES then
     forall(d in Dir where can_enter[p, d]) (
       let { int: rr = r + dr[d]; int: cc = c + dc[d] } in
-        in_bounds(rr, cc)
-        /\ grid[rr, cc] != EMPTY
-        /\ can_enter[ grid[rr, cc], opposite[d] ]
+        in_bounds(rr, cc) /\ grid[rr, cc] != EMPTY /\ can_enter[grid[rr, cc], opposite[d]]
     )
-  else
-    true
   endif
 );
 
