@@ -14,12 +14,6 @@
 %     determined by the first move from the start cell.
 %   - 'START_DIR[t]' is the EXIT direction from the start cell
 %     for the very first move (time 0 -> 1).
-%
-% Important modeling note:
-%   MiniZinc "let" bindings like "var 1..H: next_r = r0 - 1;"
-%   create an equality constraint. If r0-1 is out of bounds,
-%   the model becomes infeasible (which correctly disallows
-%   off-grid moves).
 % ============================================================
 
 
