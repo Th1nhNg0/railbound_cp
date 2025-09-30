@@ -41,6 +41,10 @@ tuple(int, int): TARGET;
 int: N_INIT_POS;  % Number of pre-placed pieces
 int: N_TUNNELS;   % Number of tunnel pairs (set to 0 if no tunnels)
 
+% --- Gates and Activations ---
+int: N_GATES;        % Number of gates
+int: N_ACTIVATIONS;  % Number of activations
+
 % ============================================================
 % TUNNEL LOOKUP ARRAYS
 % ============================================================
@@ -99,6 +103,8 @@ type Pos = tuple(int, int, Piece);           % (row, col, piece)
 type TrainStart = tuple(int, int, Dir);       % (row, col, initial_exit_dir)
 type TunnelPair = tuple(int, int, Dir,        % (row_A, col_A, exit_dir_A,
                         int, int, Dir);       %  row_B, col_B, exit_dir_B)
+type Gate = tuple(int, int, int, bool);      % (row, col, gate_id, initially_open)
+type Activation = tuple(int, int, int);      % (row, col, gate_id)
 
 % --- Track Piece Types ---
 % Visual guide:
@@ -146,6 +152,8 @@ enum Piece = {
 array[1..N_TRAINS] of TrainStart: TRAINS;      % Train starting positions
 array[1..N_INIT_POS] of Pos: INIT_POS;         % Pre-placed pieces
 array[1..N_TUNNELS] of TunnelPair: TUNNEL_PAIRS; % Tunnel pair definitions
+array[1..N_GATES] of Gate: GATES;              % Gate definitions
+array[1..N_ACTIVATIONS] of Activation: ACTIVATIONS; % Activation cell definitions
 
 % ============================================================
 % HELPER CONSTANTS

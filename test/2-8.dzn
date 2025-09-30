@@ -32,3 +32,8 @@ N_TUNNELS=1;
 TUNNEL_PAIRS=[
   (2, 3, RIGHT, 6, 1, RIGHT),  % Tunnel entrance at (2,3), exit at (6,1), both exit RIGHT
 ];
+
+N_GATES=0;
+GATES=[];
+N_ACTIVATIONS=0;
+ACTIVATIONS=[];
