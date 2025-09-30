@@ -51,7 +51,16 @@ foreach ($testFile in $testFiles) {
         # Save output to file
         $output | Out-File -FilePath $outputFile -Encoding utf8
         
-        if ($exitCode -eq 0) {
+        # Check if output contains UNSATISFIABLE
+        $outputText = $output | Out-String
+        $isUnsatisfiable = $outputText -match "=====UNSATISFIABLE====="
+        
+        if ($isUnsatisfiable) {
+            Write-Host "  Status: CAN'T SOLVE (UNSATISFIABLE)" -ForegroundColor Magenta
+            Write-Host "  Duration: $([math]::Round($duration, 2))s" -ForegroundColor Gray
+            $successCount++
+            $status = "CAN'T SOLVE"
+        } elseif ($exitCode -eq 0) {
             Write-Host "  Status: SUCCESS" -ForegroundColor Green
             Write-Host "  Duration: $([math]::Round($duration, 2))s" -ForegroundColor Gray
             $successCount++
