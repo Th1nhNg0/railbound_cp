@@ -4,9 +4,16 @@
 % Place track pieces on H×W grid for N trains to reach target sequentially,
 % without collisions, under track budget.
 %
+% Key Features:
+% - Support for straights, corners, switches, and tunnels
+% - Directional entry restrictions for tunnels
+% - Sequential train arrival requirements
+% - Collision avoidance (cells and position swaps)
+% - Track budget constraints
+%
 % Conventions:
 % - Rows: 1..H (top to bottom), Cols: 1..W (left to right)
-% - train_dir[t,time]: entry direction into cell at (t,time)
+% - train_dir[t,time]: entry direction into cell at time step
 % - TRAINS[t]: (row, col, initial_exit_direction) for train t
 % ============================================================
 
@@ -35,6 +42,7 @@ int: N_INIT_POS;
 int: N_TUNNELS;
 
 % ========= TUNNEL LOOKUP ARRAYS =============================
+% Pre-compute tunnel destinations and exit directions for efficiency
 
 % tunnel_dest[r,c] = (dest_row, dest_col) if (r,c) has a tunnel, else (0,0)
 array[1..H, 1..W] of tuple(int, int): tunnel_dest = 
@@ -116,11 +124,12 @@ enum Piece = {
   SWITCH_L_R_T,
   SWITCH_L_R_D,
 
-  % Tunnels: can enter from any direction, exit in specified direction
-  TUNNEL_T,     % Tunnel exit at TOP
-  TUNNEL_R,     % Tunnel exit at RIGHT
-  TUNNEL_D,     % Tunnel exit at DOWN
-  TUNNEL_L      % Tunnel exit at LEFT
+  % Tunnels: one-way entry, exit via teleport to paired tunnel
+  % TUNNEL_X means: can only be entered from direction X, paired tunnel exits in X direction
+  TUNNEL_T,     % Tunnel: enter from TOP only, paired tunnel exits TOP
+  TUNNEL_R,     % Tunnel: enter from RIGHT only, paired tunnel exits RIGHT
+  TUNNEL_D,     % Tunnel: enter from DOWN only, paired tunnel exits DOWN
+  TUNNEL_L      % Tunnel: enter from LEFT only, paired tunnel exits LEFT
 };
 
 % ========= REMAINING PARAMETERS =============================
@@ -180,14 +189,14 @@ array[Piece, Dir] of bool: can_enter = array2d(Piece, Dir, [
                  true,  true,  false, true,
   % SWITCH_L_R_D (entries {RIGHT,DOWN,LEFT})
                  false, true,  true,  true,
-  % TUNNEL_T (can enter from all 4 directions)
-                 true,  true,  true,  true,
-  % TUNNEL_R (can enter from all 4 directions)
-                 true,  true,  true,  true,
-  % TUNNEL_D (can enter from all 4 directions)
-                 true,  true,  true,  true,
-  % TUNNEL_L (can enter from all 4 directions)
-                 true,  true,  true,  true
+  % TUNNEL_T (can only enter from TOP, exits at paired tunnel in TOP direction)
+                 true,  false, false, false,
+  % TUNNEL_R (can only enter from RIGHT, exits at paired tunnel in RIGHT direction)
+                 false, true,  false, false,
+  % TUNNEL_D (can only enter from DOWN, exits at paired tunnel in DOWN direction)
+                 false, false, true,  false,
+  % TUNNEL_L (can only enter from LEFT, exits at paired tunnel in LEFT direction)
+                 false, false, false, true
 ]);
 
 % Which exits are physically present on each piece? (used for first hop)
@@ -234,7 +243,7 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
 ]);
 
 % Mapping: given (piece, entry_dir) return the exit_dir
-% For disallowed entries, the value is a dummy (TOP) and guarded by can_enter
+% For disallowed entries, the value is a dummy (TOP) guarded by can_enter check
 array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
   %            TOP    RIGHT  DOWN   LEFT   (entry_dir)
   % EMPTY
@@ -275,13 +284,13 @@ array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
   % SWITCH_L_R_D: S=LEFT,  T=RIGHT, C=DOWN
   %   LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
                TOP,   DOWN,  RIGHT, RIGHT,
-  % TUNNEL_T: all entries exit at TOP
+  % TUNNEL_T: entry from DOWN -> exit at TOP (only DOWN entry allowed)
                TOP,   TOP,   TOP,   TOP,
-  % TUNNEL_R: all entries exit at RIGHT
+  % TUNNEL_R: entry from LEFT -> exit at RIGHT (only RIGHT entry allowed)
                RIGHT, RIGHT, RIGHT, RIGHT,
-  % TUNNEL_D: all entries exit at DOWN
+  % TUNNEL_D: entry from TOP -> exit at DOWN (only DOWN entry allowed)
                DOWN,  DOWN,  DOWN,  DOWN,
-  % TUNNEL_L: all entries exit at LEFT
+  % TUNNEL_L: entry from RIGHT -> exit at LEFT (only LEFT entry allowed)
                LEFT,  LEFT,  LEFT,  LEFT
 ]);
 
@@ -329,6 +338,9 @@ constraint forall(t in 1..N_TRAINS) (
 );
 
 % 3) Subsequent movements (time >= 1): follow piece routing or stay at target
+%    - Normal pieces: move according to exit_of table
+%    - Tunnels: teleport to paired tunnel and exit in specified direction
+%    - At target: stay in place (all trains remain at target once arrived)
 constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
   let {
     var 1..H: r = train_row[t, time];
@@ -372,6 +384,8 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
 );
 
 % 4) Arrival ordering: trains arrive sequentially, stay at target
+%    Each train reaches the target at a specific time and remains there
+%    Trains must arrive in order: train[i] arrives before train[i+1]
 constraint forall(t in 1..N_TRAINS)(
   forall(time in 0..MAX_TIME) (
     (train_row[t, time] = TARGET_R /\ train_col[t, time] = TARGET_C)
@@ -383,7 +397,9 @@ constraint forall(t in 1..N_TRAINS-1) (
   arrival_time[t] < arrival_time[t+1]
 );
 
-% 5) Collision avoidance: no two trains at same cell except target
+% 5) Collision avoidance: no two trains at same cell except at target
+%    Prevents trains from occupying the same cell simultaneously
+%    Exception: multiple trains can be at the target cell
 constraint forall(time in 0..MAX_TIME, t1 in 1..N_TRAINS, t2 in t1+1..N_TRAINS) (
   let {
     var 1..H: r1 = train_row[t1, time];
@@ -394,7 +410,9 @@ constraint forall(time in 0..MAX_TIME, t1 in 1..N_TRAINS, t2 in t1+1..N_TRAINS) 
   (r1, c1) != (r2, c2) \/ (r1 = TARGET_R /\ c1 = TARGET_C)
 );
 
-% 6) Prevent position swaps between timesteps, except at target
+% 6) Prevent position swaps between timesteps (except at target)
+%    Two trains cannot swap positions between consecutive timesteps
+%    This prevents "passing through" each other
 constraint forall(time in 0..MAX_TIME-1, t1 in 1..N_TRAINS, t2 in t1+1..N_TRAINS) (
   let {
     var 1..H: r1t = train_row[t1, time];
@@ -445,7 +463,9 @@ constraint forall(i in 1..N_TUNNELS) (
                    else TUNNEL_L endif
 );
 
-% 9) Track budget: limit non-EMPTY pieces beyond pre-placed
+% 9) Track budget: limit non-EMPTY pieces beyond pre-placed and tunnels
+%    Ensures the solution doesn't use more track pieces than allowed
+%    Formula: (total_placed - initial_pieces - tunnel_pieces) <= MAX_TRACKS
 constraint
   let {
     var int: total_placed_tracks = sum(p in grid where p != EMPTY)(1);
@@ -455,6 +475,10 @@ constraint
   total_placed_tracks - init_tracks - init_tunnels <= MAX_TRACKS;
 
 % 10) Connectivity: corners/switches must connect to valid neighbors
+%     Each entry point of a corner or switch must connect to:
+%     - A non-EMPTY cell within bounds
+%     - A cell that can be entered from the opposite direction
+%     - OR a tunnel (tunnels have special teleportation logic)
 predicate in_bounds(int: r, int: c) = 
   r >= 1 /\ r <= H /\ c >= 1 /\ c <= W;
 
@@ -468,12 +492,13 @@ constraint forall(r in 1..H, c in 1..W) (
       } in
       in_bounds(rr, cc) /\ 
       grid[rr, cc] != EMPTY /\ 
-      can_enter[grid[rr, cc], opposite[d]]
+      (grid[rr, cc] in TUNNELS \/ can_enter[grid[rr, cc], opposite[d]])
     )
   endif
 );
 
 % 11) Restrict tunnels to only those defined in TUNNEL_PAIRS
+%     Prevents arbitrary tunnel placement - only pre-defined tunnel pairs are allowed
 constraint forall(r in 1..H, c in 1..W) (
   let { var Piece: p = grid[r, c] } in
   if p in TUNNELS then
@@ -491,14 +516,27 @@ constraint forall(r in 1..H, c in 1..W) (
 
 solve satisfy;
 
+% Display results with clear formatting
 output [
+  "============================================================\n",
+  "SOLUTION FOUND\n",
+  "============================================================\n\n",
   "GRID LAYOUT:\n",
   show2d(grid), "\n\n",
   "TRAIN PATHS:\n"
 ]
 ++
 [
-  "Train \(t): arrival at time " ++ show(arrival_time[t]) ++ "\nPath: " ++
-  show([ (train_row[t,time], train_col[t,time]) | time in 0..fix(arrival_time[t]) ]) ++ "\n"
+  "Train \(t): arrival at time \(arrival_time[t])\n" ++
+  "  Path: " ++ show([ (train_row[t,time], train_col[t,time]) | time in 0..fix(arrival_time[t]) ]) ++ "\n"
   | t in 1..N_TRAINS
+]
+++
+[
+  "\nSTATISTICS:\n",
+  "  Total pieces placed: \(sum(p in grid where p != EMPTY)(1))\n",
+  "  Additional pieces: \(sum(p in grid where p != EMPTY)(1) - sum(p in INIT_POS where p.3 != EMPTY)(1) - 2*N_TUNNELS)\n",
+  "  Track budget: \(MAX_TRACKS)\n",
+  "  Latest arrival time: \(max(arrival_time))\n",
+  "============================================================\n"
 ];

@@ -1,3 +1,10 @@
+% ============================================================
+% Easy Puzzle: Single train navigation
+% ============================================================
+% A simple puzzle to test basic track placement
+% Single train must navigate from bottom-left to top-right
+% ============================================================
+
 W=6;
 H=3;
 
