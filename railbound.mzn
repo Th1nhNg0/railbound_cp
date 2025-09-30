@@ -35,8 +35,7 @@ int: MAX_TRACKS; % Max number of non-EMPTY pieces that can be placed
 
 % --- Target Location ---
 % Unique sink cell all trains must reach, in order
-int: TARGET_R;
-int: TARGET_C;
+tuple(int, int): TARGET;
 
 % --- Pre-placed Elements ---
 int: N_INIT_POS;  % Number of pre-placed pieces
@@ -366,7 +365,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
     var 1..W: next_c = train_col[t, time+1];
     var Dir: next_entry_dir = train_dir[t, time+1];
   } in
-  if r == TARGET_R /\ c == TARGET_C then
+  if r == TARGET.1 /\ c == TARGET.2 then
     % Stay at target
     (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
   else
@@ -402,7 +401,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
 %    Trains must arrive in order: train[i] arrives before train[i+1]
 constraint forall(t in 1..N_TRAINS)(
   forall(time in 0..MAX_TIME) (
-    (train_row[t, time] = TARGET_R /\ train_col[t, time] = TARGET_C)
+    (train_row[t, time] = TARGET.1 /\ train_col[t, time] = TARGET.2)
     <-> (time >= arrival_time[t])
   )
 );
@@ -421,7 +420,7 @@ constraint forall(time in 0..MAX_TIME, t1 in 1..N_TRAINS, t2 in t1+1..N_TRAINS) 
     var 1..H: r2 = train_row[t2, time];
     var 1..W: c2 = train_col[t2, time];
   } in
-  (r1, c1) != (r2, c2) \/ (r1 = TARGET_R /\ c1 = TARGET_C)
+  (r1, c1) != (r2, c2) \/ (r1 = TARGET.1 /\ c1 = TARGET.2)
 );
 
 % 6) Prevent position swaps between timesteps (except at target)
@@ -442,10 +441,10 @@ constraint forall(time in 0..MAX_TIME-1, t1 in 1..N_TRAINS, t2 in t1+1..N_TRAINS
     % Either not swapping,
     not ( (r1t = r2n /\ c1t = c2n) /\ (r2t = r1n /\ c2t = c1n) )
     % or one of the trains is at the target (in either step).
-    \/ (r1t = TARGET_R /\ c1t = TARGET_C)
-    \/ (r2t = TARGET_R /\ c2t = TARGET_C)
-    \/ (r1n = TARGET_R /\ c1n = TARGET_C)
-    \/ (r2n = TARGET_R /\ c2n = TARGET_C)
+    \/ (r1t = TARGET.1 /\ c1t = TARGET.2)
+    \/ (r2t = TARGET.1 /\ c2t = TARGET.2)
+    \/ (r1n = TARGET.1 /\ c1n = TARGET.2)
+    \/ (r2n = TARGET.1 /\ c2n = TARGET.2)
   )
 );
 
@@ -559,7 +558,7 @@ include "ide/vis.mzn";
 any: initial_data = (
     grid_width: W,
     grid_height: H,
-    target: (TARGET_R, TARGET_C),
+    target: TARGET,
     trains: [ (TRAINS[t].1, TRAINS[t].2, TRAINS[t].3) | t in 1..N_TRAINS ],
     init_positions: [ (INIT_POS[i].1, INIT_POS[i].2, INIT_POS[i].3) | i in 1..N_INIT_POS ],
     tunnels: [ (TUNNEL_PAIRS[i].1, TUNNEL_PAIRS[i].2, TUNNEL_PAIRS[i].3, 
