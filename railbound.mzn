@@ -553,6 +553,23 @@ var int: total_cost = sum(r in 1..H, c in 1..W)(piece_cost[grid[r,c]]);
 
 solve minimize total_cost;
 
+% Display results with visualization
+include "ide/vis.mzn"; 
+
+any: initial_data = (
+    grid_width: W,
+    grid_height: H,
+    target: (TARGET_R, TARGET_C),
+    trains: [ (TRAINS[t].1, TRAINS[t].2, TRAINS[t].3) | t in 1..N_TRAINS ],
+    init_positions: [ (INIT_POS[i].1, INIT_POS[i].2, INIT_POS[i].3) | i in 1..N_INIT_POS ],
+    tunnels: [ (TUNNEL_PAIRS[i].1, TUNNEL_PAIRS[i].2, TUNNEL_PAIRS[i].3, 
+                TUNNEL_PAIRS[i].4, TUNNEL_PAIRS[i].5, TUNNEL_PAIRS[i].6) | i in 1..N_TUNNELS ],
+);
+any: solution_data :: output_only = (
+  grid:showJSON(grid)
+);
+output :: vis_server("viz.html",initial_data) solution_data;
+
 % Display results with clear formatting
 output [
   "============================================================\n",
