@@ -569,4 +569,5 @@ output [
   "Train \(t): arrival at time \(arrival_time[t])\n" ++
   "  Path: " ++ show([ (train_row[t,time], train_col[t,time]) | time in 0..fix(arrival_time[t]) ]) ++ "\n"
   | t in 1..N_TRAINS
-]
+];
+
