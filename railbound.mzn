@@ -473,6 +473,18 @@ constraint forall(r in 1..H, c in 1..W) (
   endif
 );
 
+% 11) Restrict tunnels to only those defined in TUNNEL_PAIRS
+constraint forall(r in 1..H, c in 1..W) (
+  let { var Piece: p = grid[r, c] } in
+  if p in TUNNELS then
+    % This cell must be one of the tunnel endpoints
+    exists(i in 1..N_TUNNELS) (
+      (r = TUNNEL_PAIRS[i].1 /\ c = TUNNEL_PAIRS[i].2) \/
+      (r = TUNNEL_PAIRS[i].4 /\ c = TUNNEL_PAIRS[i].5)
+    )
+  endif
+);
+
 
 
 % ========= SOLVE & OUTPUT ===================================
