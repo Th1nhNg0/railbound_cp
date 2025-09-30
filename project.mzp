@@ -1,8 +1,11 @@
 {
     "openFiles": [
-        "railbound.mzn"
+        "railbound.mzn",
+        "test/2-5A.dzn",
+        "test/2-9.dzn",
+        "test/2-8.dzn"
     ],
-    "openTab": 0,
+    "openTab": 3,
     "projectFiles": [
         "railbound.mzn",
         "test/1-11A.dzn",
@@ -16,6 +19,11 @@
         "test/1-3.dzn",
         "test/1-9.dzn",
         "test/2-1.dzn",
+        "test/2-3.dzn",
+        "test/2-3B.dzn",
+        "test/2-5A.dzn",
+        "test/2-8.dzn",
+        "test/2-9.dzn",
         "test/easy.dzn"
     ],
     "selectedBuiltinConfigId": "org.chuffed.chuffed",
