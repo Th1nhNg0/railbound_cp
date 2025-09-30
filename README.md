@@ -27,15 +27,24 @@ This project models Railbound puzzles as Constraint Satisfaction Problems (CSP) 
   - Track budget constraints
   - Pre-placed pieces
 
+- **Optimization**: Prefers simpler solutions
+  - Cost-based optimization minimizes puzzle complexity
+  - Automatically prefers straight tracks over switches when both work
+  - Produces cleaner, more elegant solutions
+
 - **Flexible input format**: Easy-to-write `.dzn` data files for puzzle definitions
-- **Automatic solving**: Finds valid solutions or proves unsatisfiability
-- **Visual output**: Displays grid layout and train paths
-- **Optimized solving**: Uses the Chuffed solver for efficient constraint propagation
+- **Automatic solving**: Finds optimal solutions or proves unsatisfiability
+- **Visual output**: Displays grid layout, piece costs, and train paths
+- **Multiple solvers**: Supports Gecode, Chuffed, and other MiniZinc solvers
+- **Well-documented code**: Clean, readable implementation with clear section organization
 
 ## Requirements
 
 - [MiniZinc](https://www.minizinc.org/software.html) (version 2.5+)
-- A MiniZinc solver (Chuffed recommended, also supports Gecode or OR-Tools)
+- A MiniZinc solver:
+  - **Gecode** (recommended for most puzzles) - Fast and reliable
+  - **Chuffed** - Good for complex puzzles
+  - **OR-Tools** - Alternative option
 
 ## Installation
 
@@ -51,20 +60,44 @@ This project models Railbound puzzles as Constraint Satisfaction Problems (CSP) 
 Run the solver on a puzzle:
 
 ```bash
-minizinc --solver chuffed railbound.mzn test/easy.dzn
+minizinc --solver Gecode railbound.mzn test/2-1.dzn
 ```
 
-Or with a time limit (in milliseconds):
+Or use Chuffed for more complex puzzles:
 
 ```bash
-minizinc --solver chuffed railbound.mzn test/2-8.dzn --time-limit 60000
+minizinc --solver Chuffed railbound.mzn test/2-8.dzn
 ```
 
-For simpler puzzles, Gecode also works well:
+With a time limit (in milliseconds):
 
 ```bash
-minizinc --solver Gecode railbound.mzn test/easy.dzn
+minizinc --solver Gecode railbound.mzn test/2-8.dzn --time-limit 60000
 ```
+
+### Output
+
+The solver produces:
+```
+============================================================
+SOLUTION FOUND
+============================================================
+
+GRID LAYOUT:
+[|       EMPTY,       EMPTY,       EMPTY, TUNNEL_R, STRAIGHT_RL, STRAIGHT_RL, STRAIGHT_RL
+ |       EMPTY,       EMPTY,       EMPTY,    EMPTY,       EMPTY,       EMPTY,       EMPTY
+ |       EMPTY,       EMPTY,       EMPTY,    EMPTY,       EMPTY,       EMPTY,       EMPTY
+ | STRAIGHT_RL, STRAIGHT_RL, STRAIGHT_RL, TUNNEL_L,       EMPTY,       EMPTY,       EMPTY
+ |]
+
+Total piece cost: 6 (straights=1, corners=2, switches=3)
+Latest arrival time: 6
+TRAIN PATHS:
+Train 1: arrival at time 6
+  Path: [(4, 1), (4, 2), (4, 3), (4, 4), (1, 5), (1, 6), (1, 7)]
+```
+
+The **total piece cost** shows how simple the solution is - lower is better!
 
 ## Puzzle Format
 
@@ -129,7 +162,8 @@ TUNNEL_PAIRS=[];        % Tunnel definitions: (row1,col1,dir1,row2,col2,dir2)
 
 The `test/` directory contains several example puzzles:
 
-- `easy.dzn`: Simple single-train puzzle
+- `2-1.dzn`: Simple puzzle demonstrating cost optimization (prefers straights over switches)
+- `easy.dzn`: Single-train puzzle
 - `1-3.dzn`: Single train with switches
 - `1-9.dzn`: Two trains requiring coordination
 - `1-11A.dzn`: Three trains with complex routing
@@ -141,29 +175,46 @@ The `test/` directory contains several example puzzles:
 Test several puzzles at once:
 
 ```bash
+# PowerShell
+Get-ChildItem test\*.dzn | ForEach-Object {
+  Write-Host "Solving $_..."
+  minizinc --solver Gecode railbound.mzn $_.FullName
+}
+
+# Bash
 for f in test/*.dzn; do
   echo "Solving $f..."
-  minizinc --solver chuffed railbound.mzn "$f" -t 30000
+  minizinc --solver Gecode railbound.mzn "$f"
 done
 ```
 
 ## How It Works
 
-The solver uses constraint programming to model the puzzle:
+The solver uses constraint programming with optimization to model the puzzle:
 
-1. **Grid variables**: Each cell can contain any track piece
-2. **Train state variables**: Position and direction for each train at each time step
-3. **Constraints**:
-   - Trains start at specified positions with initial exit directions
-   - Train movement follows track piece routing rules (straights, corners, switches)
-   - Tunnel teleportation with directional entry restrictions
-   - Trains must reach the target in sequential order (no overtaking)
-   - No collisions between trains (same cell or position swaps)
-   - Connectivity validation for corners and switches
-   - Respect the track budget (maximum number of placeable pieces)
-   - Honor pre-placed pieces and tunnel placements
+### 1. **Variables**
+- **Grid variables**: Each cell can contain any track piece
+- **Train state variables**: Position and direction for each train at each time step
+- **Arrival times**: When each train reaches the target
 
-The MiniZinc solver (Chuffed recommended) explores the search space to find a valid assignment of tracks that satisfies all constraints.
+### 2. **Constraints**
+- Trains start at specified positions with initial exit directions
+- Train movement follows track piece routing rules (straights, corners, switches)
+- Tunnel teleportation with directional entry restrictions
+- Trains must reach the target in sequential order (no overtaking)
+- No collisions between trains (same cell or position swaps)
+- Connectivity validation for corners and switches (all entry points must connect)
+- Respect the track budget (maximum number of placeable pieces)
+- Honor pre-placed pieces and tunnel placements
+
+### 3. **Optimization**
+The solver minimizes the total piece cost to prefer simpler solutions:
+- **Straight pieces**: cost = 1 (simplest)
+- **Corner pieces**: cost = 2
+- **Switch pieces**: cost = 3 (most complex)
+- **Empty/Tunnel pieces**: cost = 0 (fixed)
+
+This ensures the solver finds the cleanest, most elegant solution rather than arbitrary complex arrangements.
 
 ### Key Implementation Details
 
@@ -171,10 +222,54 @@ The MiniZinc solver (Chuffed recommended) explores the search space to find a va
 - **Switch Routing**: Switches have three connections with specific routing rules based on which direction the train enters.
 - **Collision Avoidance**: Both same-cell occupancy and position-swap collisions are prevented (except at the target cell).
 - **Sequential Arrival**: Trains must arrive at the target in order - later trains cannot reach the target before earlier trains.
+- **Connectivity Enforcement**: All entry points of corners and switches must connect to valid adjacent cells, preventing switches at boundaries where simpler pieces would work.
+
+## Project Structure
+
+```
+railbound_cp/
+├── railbound.mzn           # Main MiniZinc model (well-documented and refactored)
+├── test/                   # Example puzzle data files
+│   ├── 2-1.dzn
+│   ├── easy.dzn
+│   ├── 1-3.dzn
+│   └── ...
+├── README.md               # This file
+├── OPTIMIZATION_NOTES.md   # Details on cost-based optimization
+├── SOLUTION_SUMMARY.md     # Quick reference for the optimization approach
+└── REFACTORING_SUMMARY.md  # Code refactoring improvements
+```
+
+## Documentation
+
+- **README.md**: Main documentation (this file)
+- **OPTIMIZATION_NOTES.md**: Deep dive into why cost optimization is needed and how it works
+- **SOLUTION_SUMMARY.md**: Quick reference for the cost-based preference system
+- **REFACTORING_SUMMARY.md**: Details on code organization improvements
+
+## Code Quality
+
+The `railbound.mzn` model features:
+- ✅ Clean, well-organized structure with clear section headers
+- ✅ Comprehensive inline documentation
+- ✅ Logical grouping of related components
+- ✅ Helper predicates and constants for readability
+- ✅ Cost optimization for elegant solutions
+- ✅ Tested with multiple solvers (Gecode, Chuffed)
 
 ## Contributing
 
 Feel free to add more puzzle definitions or improve the model!
+
+### Adding New Puzzles
+
+1. Create a new `.dzn` file in the `test/` directory
+2. Define the grid size, trains, and constraints
+3. Test with: `minizinc --solver Gecode railbound.mzn test/your-puzzle.dzn`
+
+### Improving the Model
+
+The code is well-documented and refactored for readability. See `REFACTORING_SUMMARY.md` for details on the code structure.
 
 ## License
 

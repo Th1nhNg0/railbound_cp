@@ -10,6 +10,7 @@
 % - Sequential train arrival requirements
 % - Collision avoidance (cells and position swaps)
 % - Track budget constraints
+% - Cost minimization to prefer simpler pieces
 %
 % Conventions:
 % - Rows: 1..H (top to bottom), Cols: 1..W (left to right)
@@ -17,45 +18,51 @@
 % - TRAINS[t]: (row, col, initial_exit_direction) for train t
 % ============================================================
 
+include "globals.mzn";
 
+% ============================================================
+% PARAMETERS
+% ============================================================
 
-% ========= PARAMETERS =======================================
-
-% Grid dimensions
+% --- Grid Dimensions ---
 int: W;  % Grid width  (number of columns)
 int: H;  % Grid height (number of rows)
 
-% Simulation parameters
+% --- Simulation Settings ---
 int: N_TRAINS;   % Number of trains
 int: MAX_TIME;   % Max number of discrete time steps
 int: MAX_TRACKS; % Max number of non-EMPTY pieces that can be placed
 
-% Target location (unique sink cell all trains must reach, in order)
+% --- Target Location ---
+% Unique sink cell all trains must reach, in order
 int: TARGET_R;
 int: TARGET_C;
 
-% Pre-placed (fixed) pieces already on the grid
-int: N_INIT_POS;
+% --- Pre-placed Elements ---
+int: N_INIT_POS;  % Number of pre-placed pieces
+int: N_TUNNELS;   % Number of tunnel pairs (set to 0 if no tunnels)
 
-% Tunnel pairs: Each entry defines a pair of connected tunnels
-% (set N_TUNNELS=0 if no tunnels)
-int: N_TUNNELS;
-
-% ========= TUNNEL LOOKUP ARRAYS =============================
+% ============================================================
+% TUNNEL LOOKUP ARRAYS
+% ============================================================
 % Pre-compute tunnel destinations and exit directions for efficiency
 
 % tunnel_dest[r,c] = (dest_row, dest_col) if (r,c) has a tunnel, else (0,0)
 array[1..H, 1..W] of tuple(int, int): tunnel_dest = 
   array2d(1..H, 1..W, [
     let {
+      % Find if this cell is endpoint A or B of any tunnel pair
       int: idx_A = sum(i in 1..N_TUNNELS where 
                        TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
       int: idx_B = sum(i in 1..N_TUNNELS where 
                        TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
     } in
-    if idx_A > 0 then (TUNNEL_PAIRS[idx_A].4, TUNNEL_PAIRS[idx_A].5)
-    elseif idx_B > 0 then (TUNNEL_PAIRS[idx_B].1, TUNNEL_PAIRS[idx_B].2)
-    else (0, 0)
+    if idx_A > 0 then 
+      (TUNNEL_PAIRS[idx_A].4, TUNNEL_PAIRS[idx_A].5)  % A -> B
+    elseif idx_B > 0 then 
+      (TUNNEL_PAIRS[idx_B].1, TUNNEL_PAIRS[idx_B].2)  % B -> A
+    else 
+      (0, 0)  % No tunnel
     endif
   | r in 1..H, c in 1..W
   ]);
@@ -69,31 +76,32 @@ array[1..H, 1..W] of int: tunnel_exit_dir =
       int: idx_B = sum(i in 1..N_TUNNELS where 
                        TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
     } in
-    if idx_A > 0 then enum2int(TUNNEL_PAIRS[idx_A].6)
-    elseif idx_B > 0 then enum2int(TUNNEL_PAIRS[idx_B].3)
-    else 1  % Default to TOP (unused for non-tunnel cells)
+    if idx_A > 0 then 
+      enum2int(TUNNEL_PAIRS[idx_A].6)
+    elseif idx_B > 0 then 
+      enum2int(TUNNEL_PAIRS[idx_B].3)
+    else 
+      1  % Default to TOP (unused for non-tunnel cells)
     endif
   | r in 1..H, c in 1..W
   ]);
 
 
 
-% ========= TYPE DEFINITIONS =================================
+% ============================================================
+% TYPE DEFINITIONS
+% ============================================================
 
-% Directions (relative to the current cell)
+% --- Directions ---
 enum Dir = { TOP, RIGHT, DOWN, LEFT };
 
-% Position tuple: (row, col, piece kind at that cell)
-type Pos = tuple(int, int, Piece);
+% --- Type Aliases for Clarity ---
+type Pos = tuple(int, int, Piece);           % (row, col, piece)
+type TrainStart = tuple(int, int, Dir);       % (row, col, initial_exit_dir)
+type TunnelPair = tuple(int, int, Dir,        % (row_A, col_A, exit_dir_A,
+                        int, int, Dir);       %  row_B, col_B, exit_dir_B)
 
-% Train start tuple: (row, col, initial exit direction)
-type TrainStart = tuple(int, int, Dir);
-
-% Tunnel pair tuple: (row_A, col_A, dir_A, row_B, col_B, dir_B)
-% Defines two connected tunnel endpoints with their exit directions
-type TunnelPair = tuple(int, int, Dir, int, int, Dir);
-
-% All track/track-switch piece kinds available
+% --- Track Piece Types ---
 % Visual guide:
 %   STRAIGHT_TD : │ (connects TOP<->DOWN)
 %   STRAIGHT_RL : ─ (connects RIGHT<->LEFT)
@@ -103,60 +111,71 @@ type TunnelPair = tuple(int, int, Dir, int, int, Dir);
 %   TUNNEL_*    : Teleport entry (paired with another tunnel)
 enum Piece = {
   EMPTY,
-
+  
+  % Straights
   STRAIGHT_TD,  % │ connects TOP <-> DOWN
   STRAIGHT_RL,  % ─ connects RIGHT <-> LEFT
-
+  
+  % Corners
   CORNER_TR,    % └ connects TOP <-> RIGHT
   CORNER_TL,    % ┘ connects TOP <-> LEFT
   CORNER_DR,    % ┌ connects DOWN <-> RIGHT
   CORNER_DL,    % ┐ connects DOWN <-> LEFT
-
+  
   % Switches: SWITCH_<Single>_<Straight>_<Curve>
   % Rule: Single->Straight, Straight->Curve, Curve->Straight
-  % Example: SWITCH_T_D_R means TOP->DOWN, DOWN->RIGHT, RIGHT->DOWN
-  SWITCH_T_D_R,
-  SWITCH_T_D_L,
-  SWITCH_D_T_R,
-  SWITCH_D_T_L,
-  SWITCH_R_L_T,
-  SWITCH_R_L_D,
-  SWITCH_L_R_T,
-  SWITCH_L_R_D,
-
-  % Tunnels: one-way entry, exit via teleport to paired tunnel
-  % TUNNEL_X means: can only be entered from direction X, paired tunnel exits in X direction
-  TUNNEL_T,     % Tunnel: enter from TOP only, paired tunnel exits TOP
-  TUNNEL_R,     % Tunnel: enter from RIGHT only, paired tunnel exits RIGHT
-  TUNNEL_D,     % Tunnel: enter from DOWN only, paired tunnel exits DOWN
-  TUNNEL_L      % Tunnel: enter from LEFT only, paired tunnel exits LEFT
+  SWITCH_T_D_R,  % TOP->DOWN, DOWN->RIGHT, RIGHT->DOWN
+  SWITCH_T_D_L,  % TOP->DOWN, DOWN->LEFT, LEFT->DOWN
+  SWITCH_D_T_R,  % DOWN->TOP, TOP->RIGHT, RIGHT->TOP
+  SWITCH_D_T_L,  % DOWN->TOP, TOP->LEFT, LEFT->TOP
+  SWITCH_R_L_T,  % RIGHT->LEFT, LEFT->TOP, TOP->LEFT
+  SWITCH_R_L_D,  % RIGHT->LEFT, LEFT->DOWN, DOWN->LEFT
+  SWITCH_L_R_T,  % LEFT->RIGHT, RIGHT->TOP, TOP->RIGHT
+  SWITCH_L_R_D,  % LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
+  
+  % Tunnels: TUNNEL_X means enter from X, paired tunnel exits in X direction
+  TUNNEL_T,     % Enter from TOP only
+  TUNNEL_R,     % Enter from RIGHT only
+  TUNNEL_D,     % Enter from DOWN only
+  TUNNEL_L      % Enter from LEFT only
 };
 
-% ========= REMAINING PARAMETERS =============================
+% ============================================================
+% INPUT DATA
+% ============================================================
 
-% Train starting positions and initial EXIT directions
-array[1..N_TRAINS] of TrainStart: TRAINS;
+array[1..N_TRAINS] of TrainStart: TRAINS;      % Train starting positions
+array[1..N_INIT_POS] of Pos: INIT_POS;         % Pre-placed pieces
+array[1..N_TUNNELS] of TunnelPair: TUNNEL_PAIRS; % Tunnel pair definitions
 
-% Pre-placed pieces
-array[1..N_INIT_POS] of Pos: INIT_POS;
+% ============================================================
+% HELPER CONSTANTS
+% ============================================================
 
-% Tunnel pair definitions
-array[1..N_TUNNELS] of TunnelPair: TUNNEL_PAIRS;
-
-% ========= PIECE ROUTING TABLES =============================
-
-% Direction helpers
+% --- Direction Helpers ---
 array[Dir] of int: dr = [ -1,  0,  1,  0 ];  % Row deltas: TOP, RIGHT, DOWN, LEFT
-array[Dir] of int: dc = [  0,  1,  0, -1 ];  % Col deltas: TOP, RIGHT, DOWN, LEFT
+array[Dir] of int: dc = [  0,  1,  0, -1 ];  % Col deltas
 array[Dir] of Dir: opposite = [ DOWN, LEFT, TOP, RIGHT ];
 
-% Piece sets for constraint simplification
-set of Piece: CORNERS  = { CORNER_TR, CORNER_TL, CORNER_DR, CORNER_DL };
-set of Piece: SWITCHES = { SWITCH_T_D_R, SWITCH_T_D_L, SWITCH_D_T_R, SWITCH_D_T_L,
+% --- Piece Category Sets ---
+set of Piece: STRAIGHTS = { STRAIGHT_TD, STRAIGHT_RL };
+set of Piece: CORNERS   = { CORNER_TR, CORNER_TL, CORNER_DR, CORNER_DL };
+set of Piece: SWITCHES  = { SWITCH_T_D_R, SWITCH_T_D_L, SWITCH_D_T_R, SWITCH_D_T_L,
                             SWITCH_R_L_T, SWITCH_R_L_D, SWITCH_L_R_T, SWITCH_L_R_D };
-set of Piece: TUNNELS  = { TUNNEL_T, TUNNEL_R, TUNNEL_D, TUNNEL_L };
+set of Piece: TUNNELS   = { TUNNEL_T, TUNNEL_R, TUNNEL_D, TUNNEL_L };
 
-% Which entries are allowed for each piece?
+% --- Utility Predicate ---
+predicate in_bounds(int: r, int: c) = 
+  r >= 1 /\ r <= H /\ c >= 1 /\ c <= W;
+
+% ============================================================
+% PIECE ROUTING TABLES
+% ============================================================
+% Define which directions can enter/exit each piece type,
+% and where trains go based on entry direction
+
+% --- Entry Permissions ---
+% can_enter[piece, dir] = true if piece can be entered from dir
 array[Piece, Dir] of bool: can_enter = array2d(Piece, Dir, [
   %              TOP    RIGHT  DOWN   LEFT
   % EMPTY
@@ -189,17 +208,19 @@ array[Piece, Dir] of bool: can_enter = array2d(Piece, Dir, [
                  true,  true,  false, true,
   % SWITCH_L_R_D (entries {RIGHT,DOWN,LEFT})
                  false, true,  true,  true,
-  % TUNNEL_T (can only enter from TOP, exits at paired tunnel in TOP direction)
+  % TUNNEL_T (can only enter from TOP)
                  true,  false, false, false,
-  % TUNNEL_R (can only enter from RIGHT, exits at paired tunnel in RIGHT direction)
+  % TUNNEL_R (can only enter from RIGHT)
                  false, true,  false, false,
-  % TUNNEL_D (can only enter from DOWN, exits at paired tunnel in DOWN direction)
+  % TUNNEL_D (can only enter from DOWN)
                  false, false, true,  false,
-  % TUNNEL_L (can only enter from LEFT, exits at paired tunnel in LEFT direction)
+  % TUNNEL_L (can only enter from LEFT)
                  false, false, false, true
 ]);
 
-% Which exits are physically present on each piece? (used for first hop)
+% --- Exit Permissions ---
+% can_exit[piece, dir] = true if piece has a physical exit in dir
+% (used for first hop from train starting position)
 array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
   %              TOP    RIGHT  DOWN   LEFT
   % EMPTY
@@ -216,21 +237,21 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
                  false, true,  true,  false,
   % CORNER_DL
                  false, false, true,  true,
-  % SWITCH_T_D_R (S=TOP,   T=DOWN,  C=RIGHT)  exits {DOWN, RIGHT}
+  % SWITCH_T_D_R (exits {DOWN, RIGHT})
                  false, true,  true,  false,
-  % SWITCH_T_D_L (S=TOP,   T=DOWN,  C=LEFT)   exits {DOWN, LEFT}
+  % SWITCH_T_D_L (exits {DOWN, LEFT})
                  false, false, true,  true,
-  % SWITCH_D_T_R (S=DOWN,  T=TOP,   C=RIGHT)  exits {TOP, RIGHT}
+  % SWITCH_D_T_R (exits {TOP, RIGHT})
                  true,  true,  false, false,
-  % SWITCH_D_T_L (S=DOWN,  T=TOP,   C=LEFT)   exits {TOP, LEFT}
+  % SWITCH_D_T_L (exits {TOP, LEFT})
                  true,  false, false, true,
-  % SWITCH_R_L_T (S=RIGHT, T=LEFT,  C=TOP)    exits {LEFT, TOP}
+  % SWITCH_R_L_T (exits {LEFT, TOP})
                  true,  false, false, true,
-  % SWITCH_R_L_D (S=RIGHT, T=LEFT,  C=DOWN)   exits {LEFT, DOWN}
+  % SWITCH_R_L_D (exits {LEFT, DOWN})
                  false, false, true,  true,
-  % SWITCH_L_R_T (S=LEFT,  T=RIGHT, C=TOP)    exits {RIGHT, TOP}
+  % SWITCH_L_R_T (exits {RIGHT, TOP})
                  true,  true,  false, false,
-  % SWITCH_L_R_D (S=LEFT,  T=RIGHT, C=DOWN)   exits {RIGHT, DOWN}
+  % SWITCH_L_R_D (exits {RIGHT, DOWN})
                  false, true,  true,  false,
   % TUNNEL_T (exit at TOP)
                  true,  false, false, false,
@@ -242,8 +263,9 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
                  false, false, false, true
 ]);
 
-% Mapping: given (piece, entry_dir) return the exit_dir
-% For disallowed entries, the value is a dummy (TOP) guarded by can_enter check
+% --- Routing Table ---
+% exit_of[piece, entry_dir] = exit_dir
+% Defines where a train exits based on which direction it entered from
 array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
   %            TOP    RIGHT  DOWN   LEFT   (entry_dir)
   % EMPTY
@@ -260,37 +282,29 @@ array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
                TOP,   DOWN,  RIGHT, TOP,
   % CORNER_DL:    DOWN->LEFT, LEFT->DOWN
                TOP,   TOP,   LEFT,  DOWN,
-  % SWITCH_T_D_R: S=TOP,   T=DOWN,  C=RIGHT
-  %   TOP->DOWN, DOWN->RIGHT, RIGHT->DOWN
+  % SWITCH_T_D_R: TOP->DOWN, DOWN->RIGHT, RIGHT->DOWN
                DOWN,  DOWN,  RIGHT, TOP,
-  % SWITCH_T_D_L: S=TOP,   T=DOWN,  C=LEFT
-  %   TOP->DOWN, DOWN->LEFT, LEFT->DOWN
+  % SWITCH_T_D_L: TOP->DOWN, DOWN->LEFT, LEFT->DOWN
                DOWN,  TOP,   LEFT,  DOWN,
-  % SWITCH_D_T_R: S=DOWN,  T=TOP,   C=RIGHT
-  %   DOWN->TOP, TOP->RIGHT, RIGHT->TOP
+  % SWITCH_D_T_R: DOWN->TOP, TOP->RIGHT, RIGHT->TOP
                RIGHT, TOP,   TOP,   TOP,
-  % SWITCH_D_T_L: S=DOWN,  T=TOP,   C=LEFT
-  %   DOWN->TOP, TOP->LEFT, LEFT->TOP
+  % SWITCH_D_T_L: DOWN->TOP, TOP->LEFT, LEFT->TOP
                LEFT,  TOP,   TOP,   TOP,
-  % SWITCH_R_L_T: S=RIGHT, T=LEFT,  C=TOP
-  %   RIGHT->LEFT, LEFT->TOP, TOP->LEFT
+  % SWITCH_R_L_T: RIGHT->LEFT, LEFT->TOP, TOP->LEFT
                LEFT,  LEFT,  TOP,   TOP,
-  % SWITCH_R_L_D: S=RIGHT, T=LEFT,  C=DOWN
-  %   RIGHT->LEFT, LEFT->DOWN, DOWN->LEFT
+  % SWITCH_R_L_D: RIGHT->LEFT, LEFT->DOWN, DOWN->LEFT
                TOP,   LEFT,  LEFT,  DOWN,
-  % SWITCH_L_R_T: S=LEFT,  T=RIGHT, C=TOP
-  %   LEFT->RIGHT, RIGHT->TOP, TOP->RIGHT
+  % SWITCH_L_R_T: LEFT->RIGHT, RIGHT->TOP, TOP->RIGHT
                RIGHT, TOP,   TOP,   RIGHT,
-  % SWITCH_L_R_D: S=LEFT,  T=RIGHT, C=DOWN
-  %   LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
+  % SWITCH_L_R_D: LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
                TOP,   DOWN,  RIGHT, RIGHT,
-  % TUNNEL_T: entry from DOWN -> exit at TOP (only DOWN entry allowed)
+  % TUNNEL_T
                TOP,   TOP,   TOP,   TOP,
-  % TUNNEL_R: entry from LEFT -> exit at RIGHT (only RIGHT entry allowed)
+  % TUNNEL_R
                RIGHT, RIGHT, RIGHT, RIGHT,
-  % TUNNEL_D: entry from TOP -> exit at DOWN (only DOWN entry allowed)
+  % TUNNEL_D
                DOWN,  DOWN,  DOWN,  DOWN,
-  % TUNNEL_L: entry from RIGHT -> exit at LEFT (only LEFT entry allowed)
+  % TUNNEL_L
                LEFT,  LEFT,  LEFT,  LEFT
 ]);
 
@@ -479,9 +493,6 @@ constraint
 %     - A non-EMPTY cell within bounds
 %     - A cell that can be entered from the opposite direction
 %     - OR a tunnel (tunnels have special teleportation logic)
-predicate in_bounds(int: r, int: c) = 
-  r >= 1 /\ r <= H /\ c >= 1 /\ c <= W;
-
 constraint forall(r in 1..H, c in 1..W) (
   let { var Piece: p = grid[r, c] } in
   if p in CORNERS \/ p in SWITCHES then
@@ -514,7 +525,33 @@ constraint forall(r in 1..H, c in 1..W) (
 
 % ========= SOLVE & OUTPUT ===================================
 
-solve satisfy;
+% Optimization: prefer simpler pieces
+% Assign costs based on piece complexity to guide the solver toward cleaner solutions
+array[Piece] of int: piece_cost = [
+  0,  % EMPTY
+  1,  % STRAIGHT_TD
+  1,  % STRAIGHT_RL
+  2,  % CORNER_TR
+  2,  % CORNER_TL
+  2,  % CORNER_DR
+  2,  % CORNER_DL
+  3,  % SWITCH_T_D_R
+  3,  % SWITCH_T_D_L
+  3,  % SWITCH_D_T_R
+  3,  % SWITCH_D_T_L
+  3,  % SWITCH_R_L_T
+  3,  % SWITCH_R_L_D
+  3,  % SWITCH_L_R_T
+  3,  % SWITCH_L_R_D
+  0,  % TUNNEL_T (fixed, no cost)
+  0,  % TUNNEL_R (fixed, no cost)
+  0,  % TUNNEL_D (fixed, no cost)
+  0   % TUNNEL_L (fixed, no cost)
+];
+
+var int: total_cost = sum(r in 1..H, c in 1..W)(piece_cost[grid[r,c]]);
+
+solve minimize total_cost;
 
 % Display results with clear formatting
 output [
@@ -523,6 +560,8 @@ output [
   "============================================================\n\n",
   "GRID LAYOUT:\n",
   show2d(grid), "\n\n",
+  "Total piece cost: \(total_cost) (straights=1, corners=2, switches=3)\n",
+  "Latest arrival time: \(max(arrival_time))\n",
   "TRAIN PATHS:\n"
 ]
 ++
@@ -531,12 +570,3 @@ output [
   "  Path: " ++ show([ (train_row[t,time], train_col[t,time]) | time in 0..fix(arrival_time[t]) ]) ++ "\n"
   | t in 1..N_TRAINS
 ]
-++
-[
-  "\nSTATISTICS:\n",
-  "  Total pieces placed: \(sum(p in grid where p != EMPTY)(1))\n",
-  "  Additional pieces: \(sum(p in grid where p != EMPTY)(1) - sum(p in INIT_POS where p.3 != EMPTY)(1) - 2*N_TUNNELS)\n",
-  "  Track budget: \(MAX_TRACKS)\n",
-  "  Latest arrival time: \(max(arrival_time))\n",
-  "============================================================\n"
-];
