@@ -427,15 +427,39 @@ constraint forall(p in INIT_POS) (
   grid[p.1, p.2] == p.3
 );
 
+% Place tunnel pieces on the grid based on TUNNEL_PAIRS
+constraint forall(i in 1..N_TUNNELS) (
+  let {
+    int: r_A = TUNNEL_PAIRS[i,1];
+    int: c_A = TUNNEL_PAIRS[i,2];
+    int: dir_A = TUNNEL_PAIRS[i,3];
+    int: r_B = TUNNEL_PAIRS[i,4];
+    int: c_B = TUNNEL_PAIRS[i,5];
+    int: dir_B = TUNNEL_PAIRS[i,6];
+  } in
+  % Place tunnel piece at position A with exit direction dir_A
+  grid[r_A, c_A] = if dir_A == 1 then TUNNEL_T      % TOP
+                    elseif dir_A == 2 then TUNNEL_R  % RIGHT
+                    elseif dir_A == 3 then TUNNEL_D  % DOWN
+                    else TUNNEL_L endif               % LEFT
+  /\
+  % Place tunnel piece at position B with exit direction dir_B
+  grid[r_B, c_B] = if dir_B == 1 then TUNNEL_T      % TOP
+                    elseif dir_B == 2 then TUNNEL_R  % RIGHT
+                    elseif dir_B == 3 then TUNNEL_D  % DOWN
+                    else TUNNEL_L endif               % LEFT
+);
+
 
 
 % --- 6) Track budget: limit non-EMPTY pieces beyond pre-placed ---
 constraint
   let {
     var int: total_placed_tracks = sum(p in grid where p != EMPTY)(1);
-    var int: init_tracks = sum(p in INIT_POS where p.3 != EMPTY)(1);
+    int: init_tracks = sum(p in INIT_POS where p.3 != EMPTY)(1);
+    int: init_tunnels = sum(i in 1..N_TUNNELS)(2); % Each tunnel pair adds 2 pieces
   } in
-  total_placed_tracks - init_tracks <= MAX_TRACKS
+  total_placed_tracks - init_tracks - init_tunnels <= MAX_TRACKS
 ;
 
 
