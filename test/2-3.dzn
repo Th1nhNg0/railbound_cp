@@ -23,4 +23,6 @@ INIT_POS=[
 ];
 
 N_TUNNELS=1;
-TUNNEL_PAIRS=[|4, 1, RIGHT, 1, 1, RIGHT,|];
+TUNNEL_PAIRS=[
+  (4, 1, RIGHT, 1, 1, RIGHT)
+];

@@ -34,11 +34,10 @@ array[1..N_TRAINS] of Dir: START_DIR; % EXIT dir for first move from start
 int: N_INIT_POS;
 array[1..N_INIT_POS] of Pos: INIT_POS; % tuple(row, col, piece)
 
-% Tunnel pairs: Each row defines a pair of connected tunnels (optional - set N_TUNNELS=0 if no tunnels)
+% Tunnel pairs: Each entry defines a pair of connected tunnels (optional - set N_TUNNELS=0 if no tunnels)
 % Format: (row_A, col_A, dir_A, row_B, col_B, dir_B)
-% Dir values: 1=TOP, 2=RIGHT, 3=DOWN, 4=LEFT (use enum names in data files)
 int: N_TUNNELS;
-array[1..N_TUNNELS, 1..6] of int: TUNNEL_PAIRS;
+array[1..N_TUNNELS] of TunnelPair: TUNNEL_PAIRS;
 
 % Create lookup arrays for tunnel connections
 % tunnel_dest[r,c] = (dest_row, dest_col) if (r,c) has a tunnel, else (0,0)
@@ -46,11 +45,11 @@ array[1..N_TUNNELS, 1..6] of int: TUNNEL_PAIRS;
 array[1..H, 1..W] of tuple(int, int): tunnel_dest = 
   array2d(1..H, 1..W, [
     let {
-      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i,1] = r /\ TUNNEL_PAIRS[i,2] = c)(i),
-      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i,4] = r /\ TUNNEL_PAIRS[i,5] = c)(i),
+      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i),
+      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i),
     } in
-    if idx_A > 0 then (TUNNEL_PAIRS[idx_A,4], TUNNEL_PAIRS[idx_A,5])
-    elseif idx_B > 0 then (TUNNEL_PAIRS[idx_B,1], TUNNEL_PAIRS[idx_B,2])
+    if idx_A > 0 then (TUNNEL_PAIRS[idx_A].4, TUNNEL_PAIRS[idx_A].5)
+    elseif idx_B > 0 then (TUNNEL_PAIRS[idx_B].1, TUNNEL_PAIRS[idx_B].2)
     else (0, 0)
     endif
   | r in 1..H, c in 1..W
@@ -59,11 +58,11 @@ array[1..H, 1..W] of tuple(int, int): tunnel_dest =
 array[1..H, 1..W] of int: tunnel_exit_dir = 
   array2d(1..H, 1..W, [
     let {
-      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i,1] = r /\ TUNNEL_PAIRS[i,2] = c)(i),
-      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i,4] = r /\ TUNNEL_PAIRS[i,5] = c)(i),
+      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i),
+      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i),
     } in
-    if idx_A > 0 then TUNNEL_PAIRS[idx_A,6]
-    elseif idx_B > 0 then TUNNEL_PAIRS[idx_B,3]
+    if idx_A > 0 then enum2int(TUNNEL_PAIRS[idx_A].6)
+    elseif idx_B > 0 then enum2int(TUNNEL_PAIRS[idx_B].3)
     else 1  % Default to TOP (will never be used for non-tunnel cells)
     endif
   | r in 1..H, c in 1..W
@@ -75,6 +74,10 @@ array[1..H, 1..W] of int: tunnel_exit_dir =
 
 % Position tuple: (row, col, piece kind at that cell)
 type Pos = tuple(int, int, Piece);
+
+% Tunnel pair tuple: (row_A, col_A, dir_A, row_B, col_B, dir_B)
+% Defines two connected tunnel endpoints with their exit directions
+type TunnelPair = tuple(int, int, Dir, int, int, Dir);
 
 % Directions (relative to the current cell)
 enum Dir = { TOP, RIGHT, DOWN, LEFT };
@@ -430,24 +433,24 @@ constraint forall(p in INIT_POS) (
 % Place tunnel pieces on the grid based on TUNNEL_PAIRS
 constraint forall(i in 1..N_TUNNELS) (
   let {
-    int: r_A = TUNNEL_PAIRS[i,1];
-    int: c_A = TUNNEL_PAIRS[i,2];
-    int: dir_A = TUNNEL_PAIRS[i,3];
-    int: r_B = TUNNEL_PAIRS[i,4];
-    int: c_B = TUNNEL_PAIRS[i,5];
-    int: dir_B = TUNNEL_PAIRS[i,6];
+    int: r_A = TUNNEL_PAIRS[i].1;
+    int: c_A = TUNNEL_PAIRS[i].2;
+    Dir: dir_A = TUNNEL_PAIRS[i].3;
+    int: r_B = TUNNEL_PAIRS[i].4;
+    int: c_B = TUNNEL_PAIRS[i].5;
+    Dir: dir_B = TUNNEL_PAIRS[i].6;
   } in
   % Place tunnel piece at position A with exit direction dir_A
-  grid[r_A, c_A] = if dir_A == 1 then TUNNEL_T      % TOP
-                    elseif dir_A == 2 then TUNNEL_R  % RIGHT
-                    elseif dir_A == 3 then TUNNEL_D  % DOWN
-                    else TUNNEL_L endif               % LEFT
+  grid[r_A, c_A] = if dir_A == TOP then TUNNEL_T
+                    elseif dir_A == RIGHT then TUNNEL_R
+                    elseif dir_A == DOWN then TUNNEL_D
+                    else TUNNEL_L endif
   /\
   % Place tunnel piece at position B with exit direction dir_B
-  grid[r_B, c_B] = if dir_B == 1 then TUNNEL_T      % TOP
-                    elseif dir_B == 2 then TUNNEL_R  % RIGHT
-                    elseif dir_B == 3 then TUNNEL_D  % DOWN
-                    else TUNNEL_L endif               % LEFT
+  grid[r_B, c_B] = if dir_B == TOP then TUNNEL_T
+                    elseif dir_B == RIGHT then TUNNEL_R
+                    elseif dir_B == DOWN then TUNNEL_D
+                    else TUNNEL_L endif
 );
 
 
