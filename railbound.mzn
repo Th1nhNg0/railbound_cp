@@ -34,6 +34,41 @@ array[1..N_TRAINS] of Dir: START_DIR; % EXIT dir for first move from start
 int: N_INIT_POS;
 array[1..N_INIT_POS] of Pos: INIT_POS; % tuple(row, col, piece)
 
+% Tunnel pairs: Each row defines a pair of connected tunnels (optional - set N_TUNNELS=0 if no tunnels)
+% Format: (row_A, col_A, dir_A, row_B, col_B, dir_B)
+% Dir values: 1=TOP, 2=RIGHT, 3=DOWN, 4=LEFT (use enum names in data files)
+int: N_TUNNELS;
+array[1..N_TUNNELS, 1..6] of int: TUNNEL_PAIRS;
+
+% Create lookup arrays for tunnel connections
+% tunnel_dest[r,c] = (dest_row, dest_col) if (r,c) has a tunnel, else (0,0)
+% tunnel_exit_dir[r,c] = exit direction at destination tunnel
+array[1..H, 1..W] of tuple(int, int): tunnel_dest = 
+  array2d(1..H, 1..W, [
+    let {
+      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i,1] = r /\ TUNNEL_PAIRS[i,2] = c)(i),
+      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i,4] = r /\ TUNNEL_PAIRS[i,5] = c)(i),
+    } in
+    if idx_A > 0 then (TUNNEL_PAIRS[idx_A,4], TUNNEL_PAIRS[idx_A,5])
+    elseif idx_B > 0 then (TUNNEL_PAIRS[idx_B,1], TUNNEL_PAIRS[idx_B,2])
+    else (0, 0)
+    endif
+  | r in 1..H, c in 1..W
+  ]);
+
+array[1..H, 1..W] of int: tunnel_exit_dir = 
+  array2d(1..H, 1..W, [
+    let {
+      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i,1] = r /\ TUNNEL_PAIRS[i,2] = c)(i),
+      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i,4] = r /\ TUNNEL_PAIRS[i,5] = c)(i),
+    } in
+    if idx_A > 0 then TUNNEL_PAIRS[idx_A,6]
+    elseif idx_B > 0 then TUNNEL_PAIRS[idx_B,3]
+    else 1  % Default to TOP (will never be used for non-tunnel cells)
+    endif
+  | r in 1..H, c in 1..W
+  ]);
+
 
 
 % ========= ENCODINGS ========================================
@@ -51,6 +86,7 @@ enum Dir = { TOP, RIGHT, DOWN, LEFT };
 %   CORNER_*    : └┘┌┐ style turns (two-way, 90° corners)
 %   SWITCH_*    : 3-way with one 'single' end and two exits.
 %                 Naming: SWITCH_<SingleEnd>_<StraightEnd>_<CurveEnd>
+%   TUNNEL_*    : Teleport entry with specific direction (paired with another tunnel)
 enum Piece = {
   EMPTY,
 
@@ -73,7 +109,13 @@ enum Piece = {
   SWITCH_R_L_T,
   SWITCH_R_L_D,
   SWITCH_L_R_T,
-  SWITCH_L_R_D
+  SWITCH_L_R_D,
+
+  % Tunnels: open in 4 directions (can enter from any direction)
+  TUNNEL_T,     % Tunnel exit at TOP
+  TUNNEL_R,     % Tunnel exit at RIGHT
+  TUNNEL_D,     % Tunnel exit at DOWN
+  TUNNEL_L      % Tunnel exit at LEFT
 };
 
 
@@ -114,7 +156,15 @@ array[Piece, Dir] of bool: can_enter = array2d(Piece, Dir, [
   % SWITCH_L_R_T (entries {RIGHT,TOP,LEFT})
                  true,  true,  false, true,
   % SWITCH_L_R_D (entries {RIGHT,DOWN,LEFT})
-                 false, true,  true,  true
+                 false, true,  true,  true,
+  % TUNNEL_T (can enter from all 4 directions)
+                 true,  true,  true,  true,
+  % TUNNEL_R (can enter from all 4 directions)
+                 true,  true,  true,  true,
+  % TUNNEL_D (can enter from all 4 directions)
+                 true,  true,  true,  true,
+  % TUNNEL_L (can enter from all 4 directions)
+                 true,  true,  true,  true
 ]);
 
 % --- Which exits are physically present on each piece? (used for first hop) ---
@@ -150,7 +200,16 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
   % SWITCH_L_R_T (S=LEFT,  T=RIGHT, C=TOP)    exits {RIGHT, TOP}
                  true,  true,  false, false,
   % SWITCH_L_R_D (S=LEFT,  T=RIGHT, C=DOWN)   exits {RIGHT, DOWN}
-                 false, true,  true,  false
+                 false, true,  true,  false,
+
+  % TUNNEL_T (exit at TOP)
+                 true,  false, false, false,
+  % TUNNEL_R (exit at RIGHT)
+                 false, true,  false, false,
+  % TUNNEL_D (exit at DOWN)
+                 false, false, true,  false,
+  % TUNNEL_L (exit at LEFT)
+                 false, false, false, true
 ]);
 
 % --- Mapping: given (piece, entry_dir) return the exit_dir.
@@ -208,7 +267,19 @@ array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
 
   % SWITCH_L_R_D: S=LEFT,  T=RIGHT, C=DOWN
   %   LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
-               TOP,    DOWN,   RIGHT,  RIGHT
+               TOP,    DOWN,   RIGHT,  RIGHT,
+
+  % TUNNEL_T: all entries exit at TOP
+               TOP,    TOP,    TOP,    TOP,
+
+  % TUNNEL_R: all entries exit at RIGHT
+               RIGHT,  RIGHT,  RIGHT,  RIGHT,
+
+  % TUNNEL_D: all entries exit at DOWN
+               DOWN,   DOWN,   DOWN,   DOWN,
+
+  % TUNNEL_L: all entries exit at LEFT
+               LEFT,   LEFT,   LEFT,   LEFT
 ]);
 
 set of Piece: CORNERS  =
@@ -216,6 +287,8 @@ set of Piece: CORNERS  =
 set of Piece: SWITCHES =
   { SWITCH_T_D_R, SWITCH_T_D_L, SWITCH_D_T_R, SWITCH_D_T_L,
     SWITCH_R_L_T, SWITCH_R_L_D, SWITCH_L_R_T, SWITCH_L_R_D };
+set of Piece: TUNNELS =
+  { TUNNEL_T, TUNNEL_R, TUNNEL_D, TUNNEL_L };
 
 % ========= DECISION VARIABLES ================================
 
@@ -274,7 +347,24 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
   else
     % Move via piece routing
     can_enter[piece, entry_dir] /\ exit_dir = exit_of[piece, entry_dir]
- /\ next_r = r + dr[exit_dir] /\ next_c = c + dc[exit_dir] /\ next_entry_dir = opposite[exit_dir]
+ /\ (
+      % Check if current piece is a tunnel
+      if piece in TUNNELS then
+        % Teleport to the paired tunnel
+        let {
+          var tuple(int, int): dest = tunnel_dest[r, c];
+          var int: dest_exit_dir = tunnel_exit_dir[r, c];
+          var Dir: dest_exit_dir_enum = to_enum(Dir, dest_exit_dir);
+        } in
+        % Move to the paired tunnel location and exit in the paired tunnel's direction
+        next_r = dest.1 + dr[dest_exit_dir_enum] 
+     /\ next_c = dest.2 + dc[dest_exit_dir_enum] 
+     /\ next_entry_dir = opposite[dest_exit_dir_enum]
+      else
+        % Normal movement
+        next_r = r + dr[exit_dir] /\ next_c = c + dc[exit_dir] /\ next_entry_dir = opposite[exit_dir]
+      endif
+    )
  /\ can_enter[grid[next_r, next_c], next_entry_dir]
   endif
 );

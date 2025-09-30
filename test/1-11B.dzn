@@ -21,3 +21,5 @@ INIT_POS=[
   (3,5,EMPTY),
   (5,5,EMPTY),
 ];
+N_TUNNELS=0;
+TUNNEL_PAIRS=[||];
