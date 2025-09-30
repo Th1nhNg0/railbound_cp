@@ -26,9 +26,9 @@ int: TARGET_R;
 int: TARGET_C;
 
 % Train starting positions and initial EXIT directions
-array[1..N_TRAINS] of int: START_R;  % 1-based row index
-array[1..N_TRAINS] of int: START_C;  % 1-based col index
-array[1..N_TRAINS] of Dir: START_DIR; % EXIT dir for first move from start
+% Format: array of tuples (row, col, direction)
+type TrainStart = tuple(int, int, Dir);
+array[1..N_TRAINS] of TrainStart: TRAINS;
 
 % Pre-placed (fixed) pieces already on the grid
 int: N_INIT_POS;
@@ -314,14 +314,14 @@ array[1..N_TRAINS] of var 0..MAX_TIME: arrival_time;
 
 % --- 1) Initial Position: at time 0 each train is at its start cell.
 constraint forall(t in 1..N_TRAINS) (
-  train_row[t, 0] = START_R[t] /\ train_col[t, 0] = START_C[t]
+  train_row[t, 0] = TRAINS[t].1 /\ train_col[t, 0] = TRAINS[t].2
 );
 
 
 % --- 2) Movement constraints ---
 constraint forall(t in 1..N_TRAINS) (
   let {
-    int: r0 = START_R[t]; int: c0 = START_C[t]; Dir: exit0 = START_DIR[t];
+    int: r0 = TRAINS[t].1; int: c0 = TRAINS[t].2; Dir: exit0 = TRAINS[t].3;
     var 1..H: r1 = r0 + dr[exit0]; var 1..W: c1 = c0 + dc[exit0];
     var Piece: p0 = grid[r0, c0]; var Piece: p1 = grid[r1, c1];
   } in
