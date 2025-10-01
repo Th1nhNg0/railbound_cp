@@ -9,6 +9,7 @@ A constraint programming solver for [Railbound](https://afterburn.games/railboun
 Railbound is a comfy track-building puzzle game created by Afterburn. Players must place track pieces on a grid to guide trains to their destination without collisions. The game features charming aesthetics and increasingly complex puzzles involving switches, corners, and tunnels.
 
 Learn more:
+
 - Official website: https://afterburn.games/railbound/
 - Wikipedia: https://en.wikipedia.org/wiki/Railbound
 
@@ -19,6 +20,7 @@ This project models Railbound puzzles as Constraint Satisfaction Problems (CSP) 
 ## Features
 
 - **Complete puzzle modeling**: Supports all core Railbound mechanics
+
   - Straight tracks and corners
   - Switches (3-way junctions)
   - Tunnels (teleportation between paired locations with directional entry restrictions)
@@ -29,6 +31,7 @@ This project models Railbound puzzles as Constraint Satisfaction Problems (CSP) 
   - Pre-placed pieces
 
 - **Optimization**: Prefers simpler solutions
+
   - Cost-based optimization minimizes puzzle complexity
   - Automatically prefers straight tracks over switches when both work
   - Produces cleaner, more elegant solutions
@@ -44,8 +47,10 @@ This project models Railbound puzzles as Constraint Satisfaction Problems (CSP) 
 - [MiniZinc](https://www.minizinc.org/software.html) (version 2.5+)
 - A MiniZinc solver:
   - **Gecode** (recommended for most puzzles) - Fast and reliable
-  - **Chuffed** - Good for complex puzzles
+  - **Chuffed** - Good for complex puzzles (default in project file)
   - **OR-Tools** - Alternative option
+- **PowerShell** (optional, for running the batch test script)
+- **MiniZinc IDE** (optional, can open `project.mzp` for integrated development)
 
 ## Installation
 
@@ -79,6 +84,7 @@ minizinc --solver Gecode railbound.mzn test/2-8.dzn --time-limit 60000
 ### Output
 
 The solver produces:
+
 ```
 ============================================================
 SOLUTION FOUND
@@ -159,10 +165,10 @@ ACTIVATIONS=[];         % Activation definitions: (row,col,gate_id)
 - **CORNER_TL**: Corner connecting TOP↔LEFT (┘)
 - **CORNER_DR**: Corner connecting DOWN↔RIGHT (┌)
 - **CORNER_DL**: Corner connecting DOWN↔LEFT (┐)
-- **SWITCH_***: 3-way switches with naming pattern `SWITCH_<Single>_<Straight>_<Curve>`
+- **SWITCH\_\***: 3-way switches with naming pattern `SWITCH_<Single>_<Straight>_<Curve>`
   - Example: `SWITCH_T_D_R` connects TOP→DOWN (straight), DOWN→RIGHT (curve), RIGHT→DOWN
   - Example: `SWITCH_D_T_L` connects DOWN→TOP (straight), TOP→LEFT (curve), LEFT→TOP
-- **TUNNEL_***: Tunnel entrances with **directional entry restrictions**
+- **TUNNEL\_\***: Tunnel entrances with **directional entry restrictions**
   - `TUNNEL_T`: Can only be entered from TOP, paired tunnel exits in TOP direction
   - `TUNNEL_R`: Can only be entered from RIGHT, paired tunnel exits in RIGHT direction
   - `TUNNEL_D`: Can only be entered from DOWN, paired tunnel exits in DOWN direction
@@ -177,7 +183,6 @@ ACTIVATIONS=[];         % Activation definitions: (row,col,gate_id)
   - States: OPEN (trains can pass) or CLOSED (trains cannot enter)
   - Each gate has a `gate_id` that links it to activations
   - Multiple gates can share the same ID (they toggle together)
-  
 - **Activations**: Trigger points that toggle gate states
   - When a train enters an activation cell at time `t`, all gates with matching `gate_id` toggle at time `t+1`
   - OPEN gates become CLOSED, CLOSED gates become OPEN
@@ -185,6 +190,7 @@ ACTIVATIONS=[];         % Activation definitions: (row,col,gate_id)
   - Trains blocked by closed gates will wait in place until the gate opens
 
 **Example:**
+
 ```minizinc
 N_GATES=1;
 GATES=[(1,2,1,false)];        % Gate at (1,2), ID=1, starts CLOSED
@@ -195,19 +201,58 @@ ACTIVATIONS=[(2,4,1)];        % Activation at (2,4) triggers gate ID=1
 
 ## Example Puzzles
 
-The `test/` directory contains several example puzzles:
+The `test/` directory contains 28 example puzzles from different worlds:
+
+### World 1 Puzzles (9 puzzles)
 
 - `1-3.dzn`: Single train with switches
 - `1-9.dzn`: Two trains requiring coordination
-- `1-11A.dzn`: Three trains with complex routing
+- `1-11A.dzn`, `1-11B.dzn`: Three trains with complex routing
+- `1-12.dzn`, `1-12A.dzn`: Multi-train coordination
+- `1-13.dzn`, `1-13A.dzn`: Advanced routing
+- `1-14A.dzn`, `1-15A.dzn`: Complex multi-train puzzles
+
+### World 2 Puzzles (7 puzzles)
+
 - `2-1.dzn`: Simple puzzle demonstrating cost optimization
+- `2-3.dzn`, `2-3B.dzn`: Coordination puzzles
+- `2-5A.dzn`, `2-5B.dzn`: Switch-heavy puzzles
 - `2-8.dzn`: Three trains with tunnel teleportation
+- `2-9.dzn`: Advanced tunnel usage
+
+### World 3 Puzzles (10 puzzles)
+
 - `3-1.dzn`: Basic gate and activation puzzle
 - `3-2.dzn`: Single gate coordination between trains
 - `3-3A.dzn`: Complex gate coordination
-- And more...
+- `3-6.dzn`, `3-7.dzn`, `3-8.dzn`: Advanced gate puzzles
+- `3-10C.dzn`: Challenging puzzle (may require longer solve time)
+- `3-11.dzn`, `3-11B.dzn`: Complex multi-gate scenarios
+
+### World 8 Puzzles (2 puzzles)
+
+- `8-1.dzn`, `8-2.dzn`: Advanced challenge puzzles
 
 ### Running Multiple Tests
+
+#### Using the PowerShell Test Runner (Recommended)
+
+The project includes a comprehensive test runner script that runs all puzzles and collects statistics:
+
+```powershell
+.\run_all_tests.ps1
+```
+
+This script:
+
+- Runs all test files in the `test/` directory
+- Uses the Chuffed solver by default
+- Collects detailed statistics (solve time, nodes, failures, variables, etc.)
+- Saves output to the `results/` directory
+- Generates a summary CSV file with all statistics
+- Color-coded output for easy reading
+
+#### Manual Batch Testing
 
 Test several puzzles at once:
 
@@ -230,11 +275,13 @@ done
 The solver uses constraint programming with optimization to model the puzzle:
 
 ### 1. **Variables**
+
 - **Grid variables**: Each cell can contain any track piece
 - **Train state variables**: Position and direction for each train at each time step
 - **Arrival times**: When each train reaches the target
 
 ### 2. **Constraints**
+
 - Trains start at specified positions with initial exit directions
 - Train movement follows track piece routing rules (straights, corners, switches)
 - Tunnel teleportation with directional entry restrictions
@@ -247,7 +294,9 @@ The solver uses constraint programming with optimization to model the puzzle:
 - Honor pre-placed pieces, tunnel placements, gates, and activations
 
 ### 3. **Optimization**
+
 The solver minimizes the total piece cost to prefer simpler solutions:
+
 - **Straight pieces**: cost = 1 (simplest)
 - **Corner pieces**: cost = 2
 - **Switch pieces**: cost = 3 (most complex)
@@ -270,24 +319,31 @@ This ensures the solver finds the cleanest, most elegant solution rather than ar
 railbound_cp/
 ├── railbound.mzn           # Main MiniZinc model (well-documented and refactored)
 ├── viz.html                # Interactive visualization for puzzle solutions
-├── test/                   # Example puzzle data files
-│   ├── 1-3.dzn
-│   ├── 2-1.dzn
-│   ├── 3-1.dzn            # Gate/activation example
+├── project.mzp             # MiniZinc IDE project file
+├── run_all_tests.ps1       # PowerShell script to run all tests with statistics
+├── cheatsheet.mzn          # Quick reference for MiniZinc syntax
+├── cover.jpg               # Cover image
+├── test/                   # Example puzzle data files (28 puzzles)
+│   ├── 1-*.dzn            # World 1 puzzles (9 files)
+│   ├── 2-*.dzn            # World 2 puzzles (7 files)
+│   ├── 3-*.dzn            # World 3 puzzles (10 files)
+│   ├── 8-*.dzn            # World 8 puzzles (2 files)
 │   └── ...
-├── README.md               # This file
-└── GATES_ACTIVATIONS_SPEC.md  # Detailed specification for gates feature
+├── results/                # Test output directory (gitignored)
+│   └── test_results.csv   # Summary of test runs
+└── README.md               # This file
 ```
 
 ## Documentation
 
 - **README.md**: Main documentation (this file)
-- **GATES_ACTIVATIONS_SPEC.md**: Detailed specification for gates and activations feature
 - **viz.html**: Interactive visualization that displays gates (colored circles) and activations (orange squares)
+- **railbound.mzn**: Extensively commented model with inline documentation
 
 ## Code Quality
 
 The `railbound.mzn` model features:
+
 - ✅ Clean, well-organized structure with clear section headers
 - ✅ Comprehensive inline documentation
 - ✅ Logical grouping of related components
@@ -307,7 +363,14 @@ Feel free to add more puzzle definitions or improve the model!
 
 ### Improving the Model
 
-The code is well-documented and refactored for readability. See `REFACTORING_SUMMARY.md` for details on the code structure.
+The code is well-documented and refactored for readability. Key sections include:
+
+- Parameter definitions
+- Type definitions and track piece enums
+- Helper constants and lookup tables
+- Decision variables
+- Constraints (movement, collision, gates, etc.)
+- Optimization objective
 
 ## License
 
