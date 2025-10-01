@@ -28,3 +28,6 @@ N_GATES=2;
 GATES=[(2,4,1,false),(4,3,2,false)];
 N_ACTIVATIONS=2;
 ACTIVATIONS=[(2,5,2),(4,4,1)];
+
+N_DSWITCHES=0;
+DSWITCHES=[];

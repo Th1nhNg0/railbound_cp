@@ -5,7 +5,9 @@
 % without collisions, under track budget.
 %
 % Key Features:
-% - Support for straights, corners, switches, and tunnels
+% - Support for straights, corners, switches, dynamic switches, and tunnels
+% - Dynamic switches (DSWITCHes) that reconfigure when activated
+% - Gates and activations for blocking and triggering mechanisms
 % - Directional entry restrictions for tunnels
 % - Sequential train arrival requirements
 % - Collision avoidance (cells and position swaps)
@@ -44,6 +46,9 @@ int: N_TUNNELS;   % Number of tunnel pairs (set to 0 if no tunnels)
 % --- Gates and Activations ---
 int: N_GATES;        % Number of gates
 int: N_ACTIVATIONS;  % Number of activations
+
+% --- Dynamic Switches ---
+int: N_DSWITCHES;    % Number of dynamic switches
 
 % ============================================================
 % TUNNEL LOOKUP ARRAYS
@@ -105,6 +110,7 @@ type TunnelPair = tuple(int, int, Dir,        % (row_A, col_A, exit_dir_A,
                         int, int, Dir);       %  row_B, col_B, exit_dir_B)
 type Gate = tuple(int, int, int, bool);      % (row, col, gate_id, initially_open)
 type Activation = tuple(int, int, int);      % (row, col, gate_id)
+type DSwitch = tuple(int, int, int);         % (row, col, dswitch_id)
 
 % --- Track Piece Types ---
 % Visual guide:
@@ -138,6 +144,17 @@ enum Piece = {
   SWITCH_L_R_T,  % LEFT->RIGHT, RIGHT->TOP, TOP->RIGHT
   SWITCH_L_R_D,  % LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
   
+  % Dynamic Switches: DSWITCH_<Single>_<Straight>_<Curve>
+  % Can swap Single and Straight connections when activated
+  DSWITCH_T_D_R,  % TOP->DOWN, DOWN->RIGHT, RIGHT->DOWN (initial state)
+  DSWITCH_T_D_L,  % TOP->DOWN, DOWN->LEFT, LEFT->DOWN
+  DSWITCH_D_T_R,  % DOWN->TOP, TOP->RIGHT, RIGHT->TOP
+  DSWITCH_D_T_L,  % DOWN->TOP, TOP->LEFT, LEFT->TOP
+  DSWITCH_R_L_T,  % RIGHT->LEFT, LEFT->TOP, TOP->LEFT
+  DSWITCH_R_L_D,  % RIGHT->LEFT, LEFT->DOWN, DOWN->LEFT
+  DSWITCH_L_R_T,  % LEFT->RIGHT, RIGHT->TOP, TOP->RIGHT
+  DSWITCH_L_R_D,  % LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
+  
   % Tunnels: TUNNEL_X means enter from X, paired tunnel exits in X direction
   TUNNEL_T,     % Enter from TOP only
   TUNNEL_R,     % Enter from RIGHT only
@@ -154,6 +171,7 @@ array[1..N_INIT_POS] of Pos: INIT_POS;         % Pre-placed pieces
 array[1..N_TUNNELS] of TunnelPair: TUNNEL_PAIRS; % Tunnel pair definitions
 array[1..N_GATES] of Gate: GATES;              % Gate definitions
 array[1..N_ACTIVATIONS] of Activation: ACTIVATIONS; % Activation cell definitions
+array[1..N_DSWITCHES] of DSwitch: DSWITCHES;   % Dynamic switch definitions
 
 % ============================================================
 % HELPER CONSTANTS
@@ -169,6 +187,8 @@ set of Piece: STRAIGHTS = { STRAIGHT_TD, STRAIGHT_RL };
 set of Piece: CORNERS   = { CORNER_TR, CORNER_TL, CORNER_DR, CORNER_DL };
 set of Piece: SWITCHES  = { SWITCH_T_D_R, SWITCH_T_D_L, SWITCH_D_T_R, SWITCH_D_T_L,
                             SWITCH_R_L_T, SWITCH_R_L_D, SWITCH_L_R_T, SWITCH_L_R_D };
+set of Piece: DSWITCHES_SET = { DSWITCH_T_D_R, DSWITCH_T_D_L, DSWITCH_D_T_R, DSWITCH_D_T_L,
+                                DSWITCH_R_L_T, DSWITCH_R_L_D, DSWITCH_L_R_T, DSWITCH_L_R_D };
 set of Piece: TUNNELS   = { TUNNEL_T, TUNNEL_R, TUNNEL_D, TUNNEL_L };
 
 % --- Utility Predicate ---
@@ -215,6 +235,22 @@ array[Piece, Dir] of bool: can_enter = array2d(Piece, Dir, [
                  true,  true,  false, true,
   % SWITCH_L_R_D (entries {RIGHT,DOWN,LEFT})
                  false, true,  true,  true,
+  % DSWITCH_T_D_R (entries {TOP,RIGHT,DOWN})
+                 true,  true,  true,  false,
+  % DSWITCH_T_D_L (entries {TOP,LEFT,DOWN})
+                 true,  false, true,  true,
+  % DSWITCH_D_T_R (entries {TOP,RIGHT,DOWN})
+                 true,  true,  true,  false,
+  % DSWITCH_D_T_L (entries {TOP,LEFT,DOWN})
+                 true,  false, true,  true,
+  % DSWITCH_R_L_T (entries {LEFT,TOP,RIGHT})
+                 true,  true,  false, true,
+  % DSWITCH_R_L_D (entries {LEFT,DOWN,RIGHT})
+                 false, true,  true,  true,
+  % DSWITCH_L_R_T (entries {RIGHT,TOP,LEFT})
+                 true,  true,  false, true,
+  % DSWITCH_L_R_D (entries {RIGHT,DOWN,LEFT})
+                 false, true,  true,  true,
   % TUNNEL_T (can only enter from TOP)
                  true,  false, false, false,
   % TUNNEL_R (can only enter from RIGHT)
@@ -259,6 +295,22 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
   % SWITCH_L_R_T (exits {RIGHT, TOP})
                  true,  true,  false, false,
   % SWITCH_L_R_D (exits {RIGHT, DOWN})
+                 false, true,  true,  false,
+  % DSWITCH_T_D_R (exits {DOWN, RIGHT})
+                 false, true,  true,  false,
+  % DSWITCH_T_D_L (exits {DOWN, LEFT})
+                 false, false, true,  true,
+  % DSWITCH_D_T_R (exits {TOP, RIGHT})
+                 true,  true,  false, false,
+  % DSWITCH_D_T_L (exits {TOP, LEFT})
+                 true,  false, false, true,
+  % DSWITCH_R_L_T (exits {LEFT, TOP})
+                 true,  false, false, true,
+  % DSWITCH_R_L_D (exits {LEFT, DOWN})
+                 false, false, true,  true,
+  % DSWITCH_L_R_T (exits {RIGHT, TOP})
+                 true,  true,  false, false,
+  % DSWITCH_L_R_D (exits {RIGHT, DOWN})
                  false, true,  true,  false,
   % TUNNEL_T (exit at TOP)
                  true,  false, false, false,
@@ -305,6 +357,22 @@ array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
                RIGHT, TOP,   TOP,   RIGHT,
   % SWITCH_L_R_D: LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
                TOP,   DOWN,  RIGHT, RIGHT,
+  % DSWITCH_T_D_R: TOP->DOWN, DOWN->RIGHT, RIGHT->DOWN (initial state)
+               DOWN,  DOWN,  RIGHT, TOP,
+  % DSWITCH_T_D_L: TOP->DOWN, DOWN->LEFT, LEFT->DOWN
+               DOWN,  TOP,   LEFT,  DOWN,
+  % DSWITCH_D_T_R: DOWN->TOP, TOP->RIGHT, RIGHT->TOP
+               RIGHT, TOP,   TOP,   TOP,
+  % DSWITCH_D_T_L: DOWN->TOP, TOP->LEFT, LEFT->TOP
+               LEFT,  TOP,   TOP,   TOP,
+  % DSWITCH_R_L_T: RIGHT->LEFT, LEFT->TOP, TOP->LEFT
+               LEFT,  LEFT,  TOP,   TOP,
+  % DSWITCH_R_L_D: RIGHT->LEFT, LEFT->DOWN, DOWN->LEFT
+               TOP,   LEFT,  LEFT,  DOWN,
+  % DSWITCH_L_R_T: LEFT->RIGHT, RIGHT->TOP, TOP->RIGHT
+               RIGHT, TOP,   TOP,   RIGHT,
+  % DSWITCH_L_R_D: LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
+               TOP,   DOWN,  RIGHT, RIGHT,
   % TUNNEL_T
                TOP,   TOP,   TOP,   TOP,
   % TUNNEL_R
@@ -314,6 +382,78 @@ array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
   % TUNNEL_L
                LEFT,  LEFT,  LEFT,  LEFT
 ]);
+
+% --- Dynamic DSWITCH Routing Function ---
+% Returns the exit direction for a DSWITCH piece based on entry direction and swap state
+% When swapped: Single and Straight connections swap; Curve connection unchanged
+function var Dir: dswitch_exit(var Piece: piece, var Dir: entry_dir, var bool: is_swapped) =
+  if not is_swapped then
+    % Normal state: use standard exit_of table
+    exit_of[piece, entry_dir]
+  else
+    % Swapped state: Single and Straight are swapped
+    if piece == DSWITCH_T_D_R then
+      % Normal: TOP(single)->DOWN, DOWN(straight)->RIGHT, RIGHT(curve)->DOWN
+      % Swapped: DOWN(single)->TOP, TOP(straight)->RIGHT, RIGHT(curve)->TOP
+      if entry_dir == TOP then RIGHT      % Was straight, now goes to curve
+      elseif entry_dir == DOWN then TOP   % Was single, now goes to straight
+      elseif entry_dir == RIGHT then TOP  % Was curve, now goes to straight
+      else TOP endif
+    elseif piece == DSWITCH_T_D_L then
+      % Normal: TOP->DOWN, DOWN->LEFT, LEFT->DOWN
+      % Swapped: DOWN->TOP, TOP->LEFT, LEFT->TOP
+      if entry_dir == TOP then LEFT       % Was straight, now goes to curve
+      elseif entry_dir == DOWN then TOP   % Was single, now goes to straight
+      elseif entry_dir == LEFT then TOP   % Was curve, now goes to straight
+      else TOP endif
+    elseif piece == DSWITCH_D_T_R then
+      % Normal: DOWN->TOP, TOP->RIGHT, RIGHT->TOP
+      % Swapped: TOP->DOWN, DOWN->RIGHT, RIGHT->DOWN
+      if entry_dir == DOWN then RIGHT     % Was straight, now goes to curve
+      elseif entry_dir == TOP then DOWN   % Was single, now goes to straight
+      elseif entry_dir == RIGHT then DOWN % Was curve, now goes to straight
+      else TOP endif
+    elseif piece == DSWITCH_D_T_L then
+      % Normal: DOWN->TOP, TOP->LEFT, LEFT->TOP
+      % Swapped: TOP->DOWN, DOWN->LEFT, LEFT->DOWN
+      if entry_dir == DOWN then LEFT      % Was straight, now goes to curve
+      elseif entry_dir == TOP then DOWN   % Was single, now goes to straight
+      elseif entry_dir == LEFT then DOWN  % Was curve, now goes to straight
+      else TOP endif
+    elseif piece == DSWITCH_R_L_T then
+      % Normal: RIGHT->LEFT, LEFT->TOP, TOP->LEFT
+      % Swapped: LEFT->RIGHT, RIGHT->TOP, TOP->RIGHT
+      if entry_dir == RIGHT then TOP      % Was straight, now goes to curve
+      elseif entry_dir == LEFT then RIGHT % Was single, now goes to straight
+      elseif entry_dir == TOP then RIGHT  % Was curve, now goes to straight
+      else TOP endif
+    elseif piece == DSWITCH_R_L_D then
+      % Normal: RIGHT->LEFT, LEFT->DOWN, DOWN->LEFT
+      % Swapped: LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
+      if entry_dir == RIGHT then DOWN     % Was straight, now goes to curve
+      elseif entry_dir == LEFT then RIGHT % Was single, now goes to straight
+      elseif entry_dir == DOWN then RIGHT % Was curve, now goes to straight
+      else TOP endif
+    elseif piece == DSWITCH_L_R_T then
+      % Normal: LEFT->RIGHT, RIGHT->TOP, TOP->RIGHT
+      % Swapped: RIGHT->LEFT, LEFT->TOP, TOP->LEFT
+      if entry_dir == LEFT then TOP       % Was straight, now goes to curve
+      elseif entry_dir == RIGHT then LEFT % Was single, now goes to straight
+      elseif entry_dir == TOP then LEFT   % Was curve, now goes to straight
+      else TOP endif
+    elseif piece == DSWITCH_L_R_D then
+      % Normal: LEFT->RIGHT, RIGHT->DOWN, DOWN->RIGHT
+      % Swapped: RIGHT->LEFT, LEFT->DOWN, DOWN->LEFT
+      if entry_dir == LEFT then DOWN      % Was straight, now goes to curve
+      elseif entry_dir == RIGHT then LEFT % Was single, now goes to straight
+      elseif entry_dir == DOWN then LEFT  % Was curve, now goes to straight
+      else TOP endif
+    else
+      % Not a DSWITCH, shouldn't happen
+      exit_of[piece, entry_dir]
+    endif
+  endif;
+
 
 % ========= DECISION VARIABLES ===============================
 
@@ -333,6 +473,8 @@ array[1..N_TRAINS] of var 0..MAX_TIME: arrival_time;
 % Gate states over time: true = OPEN, false = CLOSED
 array[1..N_GATES, 0..MAX_TIME] of var bool: gate_open;
 
+% DSWITCH states over time: false = normal, true = swapped
+array[1..N_DSWITCHES, 0..MAX_TIME] of var bool: dswitch_swapped;
 
 
 % ========= CONSTRAINTS ======================================
@@ -376,6 +518,7 @@ constraint forall(t in 1..N_TRAINS) (
 
 % 3) Subsequent movements (time >= 1): follow piece routing or stay at target
 %    - Normal pieces: move according to exit_of table
+%    - DSWITCHes: use dynamic routing based on current swap state
 %    - Tunnels: teleport to paired tunnel and exit in specified direction
 %    - At target: stay in place (all trains remain at target once arrived)
 %    - Blocked by closed gate: stay in place (train waits)
@@ -397,6 +540,13 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
     var bool: blocked_by_gate = exists(g in 1..N_GATES) (
       intended_r = GATES[g].1 /\ intended_c = GATES[g].2 /\ not gate_open[g, time+1]
     );
+    % Check if current piece is a DSWITCH and get its swap state
+    var bool: is_dswitch = piece in DSWITCHES_SET;
+    var bool: dswitch_state = if is_dswitch then
+      exists(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c) (
+        dswitch_swapped[ds, time]
+      )
+    else false endif;
   } in
   if r == TARGET.1 /\ c == TARGET.2 then
     % Stay at target
@@ -404,7 +554,14 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
   else
     % Compute intended movement via piece routing
     can_enter[piece, entry_dir] /\ 
-    exit_dir = exit_of[piece, entry_dir] /\ 
+    (
+      % Compute exit direction based on piece type
+      if is_dswitch then
+        exit_dir = dswitch_exit(piece, entry_dir, dswitch_state)
+      else
+        exit_dir = exit_of[piece, entry_dir]
+      endif
+    ) /\ 
     (
       % Check if current piece is a tunnel
       if piece in TUNNELS then
@@ -526,14 +683,14 @@ constraint
   } in
   total_placed_tracks - init_tracks - init_tunnels <= MAX_TRACKS;
 
-% 10) Connectivity: corners/switches must connect to valid neighbors
-%     Each entry point of a corner or switch must connect to:
+% 10) Connectivity: corners/switches/dswitches must connect to valid neighbors
+%     Each entry point of a corner, switch, or dswitch must connect to:
 %     - A non-EMPTY cell within bounds
 %     - A cell that can be entered from the opposite direction
 %     - OR a tunnel (tunnels have special teleportation logic)
 constraint forall(r in 1..H, c in 1..W) (
   let { var Piece: p = grid[r, c] } in
-  if p in CORNERS \/ p in SWITCHES then
+  if p in CORNERS \/ p in SWITCHES \/ p in DSWITCHES_SET then
     forall(d in Dir where can_enter[p, d]) (
       let { 
         int: rr = r + dr[d];
@@ -559,6 +716,18 @@ constraint forall(r in 1..H, c in 1..W) (
   endif
 );
 
+% 11b) Restrict DSWITCHes to only those defined in DSWITCHES array
+%      Prevents arbitrary DSWITCH placement - only pre-defined DSWITCHes are allowed
+constraint forall(r in 1..H, c in 1..W) (
+  let { var Piece: p = grid[r, c] } in
+  if p in DSWITCHES_SET then
+    % This cell must be one of the pre-defined DSWITCH locations
+    exists(ds in 1..N_DSWITCHES) (
+      r = DSWITCHES[ds].1 /\ c = DSWITCHES[ds].2
+    )
+  endif
+);
+
 % ========= GATE AND ACTIVATION CONSTRAINTS ==================
 
 % 12) Gate validation: gates must be on non-EMPTY track pieces
@@ -576,9 +745,9 @@ constraint forall(a in ACTIVATIONS) (
   grid[a.1, a.2] != EMPTY
 );
 
-% 15) Activation validation: activations only on STRAIGHT, CORNER, or SWITCH tracks
+% 15) Activation validation: activations only on STRAIGHT, CORNER, SWITCH, or DSWITCH tracks
 constraint forall(a in ACTIVATIONS) (
-  grid[a.1, a.2] in (STRAIGHTS union CORNERS union SWITCHES)
+  grid[a.1, a.2] in (STRAIGHTS union CORNERS union SWITCHES union DSWITCHES_SET)
 );
 
 % 16) No coexistence: gates and activations cannot share the same cell
@@ -620,6 +789,45 @@ constraint forall(t in 1..N_TRAINS, time in 0..MAX_TIME, g in 1..N_GATES) (
   (train_row[t, time] = GATES[g].1 /\ train_col[t, time] = GATES[g].2) -> gate_open[g, time]
 );
 
+% ========= DSWITCH CONSTRAINTS ==============================
+
+% 21) DSWITCH validation: DSWITCHes must be pre-placed via INIT_POS
+constraint forall(ds in DSWITCHES) (
+  grid[ds.1, ds.2] in DSWITCHES_SET
+);
+
+% 22) No coexistence: DSWITCHes cannot share cells with gates or activations
+constraint forall(ds in DSWITCHES, g in GATES) (
+  not (ds.1 = g.1 /\ ds.2 = g.2)
+);
+constraint forall(ds in DSWITCHES, a in ACTIVATIONS) (
+  not (ds.1 = a.1 /\ ds.2 = a.2)
+);
+
+% 23) Initial DSWITCH states (at time 0) - all start in normal state
+constraint forall(ds in 1..N_DSWITCHES) (
+  dswitch_swapped[ds, 0] = false
+);
+
+% 24) DSWITCH state transitions: toggle when linked activation is triggered
+%     Activations only trigger on ENTRY (when train wasn't there previous timestep)
+%     All DSWITCHes with the same ID toggle together
+constraint forall(ds in 1..N_DSWITCHES, time in 0..MAX_TIME-1) (
+  let {
+    int: dswitch_id = DSWITCHES[ds].3;
+    % Check if any train ENTERS an activation point at this time
+    % (is at activation at time, but wasn't there at time-1)
+    var bool: activation_triggered = exists(t in 1..N_TRAINS, a in ACTIVATIONS where a.3 = dswitch_id) (
+      train_row[t, time] = a.1 /\ train_col[t, time] = a.2 /\
+      (time = 0 \/ (train_row[t, time-1] != a.1 \/ train_col[t, time-1] != a.2))
+    );
+  } in
+  if activation_triggered then
+    dswitch_swapped[ds, time+1] = not dswitch_swapped[ds, time]  % Toggle
+  else
+    dswitch_swapped[ds, time+1] = dswitch_swapped[ds, time]      % No change
+  endif
+);
 
 
 % ========= SOLVE & OUTPUT ===================================
@@ -642,6 +850,14 @@ array[Piece] of int: piece_cost = [
   3,  % SWITCH_R_L_D
   3,  % SWITCH_L_R_T
   3,  % SWITCH_L_R_D
+  0,  % DSWITCH_T_D_R (pre-placed only, no cost)
+  0,  % DSWITCH_T_D_L (pre-placed only, no cost)
+  0,  % DSWITCH_D_T_R (pre-placed only, no cost)
+  0,  % DSWITCH_D_T_L (pre-placed only, no cost)
+  0,  % DSWITCH_R_L_T (pre-placed only, no cost)
+  0,  % DSWITCH_R_L_D (pre-placed only, no cost)
+  0,  % DSWITCH_L_R_T (pre-placed only, no cost)
+  0,  % DSWITCH_L_R_D (pre-placed only, no cost)
   0,  % TUNNEL_T (fixed, no cost)
   0,  % TUNNEL_R (fixed, no cost)
   0,  % TUNNEL_D (fixed, no cost)
@@ -665,6 +881,7 @@ any: initial_data = (
                 TUNNEL_PAIRS[i].4, TUNNEL_PAIRS[i].5, TUNNEL_PAIRS[i].6) | i in 1..N_TUNNELS ],
     gates: [ (GATES[g].1, GATES[g].2, GATES[g].3, GATES[g].4) | g in 1..N_GATES ],
     activations: [ (ACTIVATIONS[a].1, ACTIVATIONS[a].2, ACTIVATIONS[a].3) | a in 1..N_ACTIVATIONS ],
+    dswitches: [ (DSWITCHES[ds].1, DSWITCHES[ds].2, DSWITCHES[ds].3) | ds in 1..N_DSWITCHES ],
 );
 any: solution_data :: output_only = (
   grid:showJSON(grid)

@@ -23,6 +23,7 @@ This project models Railbound puzzles as Constraint Satisfaction Problems (CSP) 
 
   - Straight tracks and corners
   - Switches (3-way junctions)
+  - Dynamic switches (DSWITCHes) - reconfigurable switches that toggle when activated
   - Tunnels (teleportation between paired locations with directional entry restrictions)
   - Gates and activations (blocking mechanisms with trigger-based toggling)
   - Multiple trains with sequential arrival requirements
@@ -138,6 +139,9 @@ GATES=[];               % Gate definitions: (row,col,gate_id,initially_open)
 
 N_ACTIVATIONS=0;        % Number of activations
 ACTIVATIONS=[];         % Activation definitions: (row,col,gate_id)
+
+N_DSWITCHES=0;          % Number of dynamic switches
+DSWITCHES=[];           % DSwitch definitions: (row,col,dswitch_id)
 ```
 
 ### Parameters
@@ -155,6 +159,11 @@ ACTIVATIONS=[];         % Activation definitions: (row,col,gate_id)
   - `initially_open`: `true` if gate starts open, `false` if closed
 - **ACTIVATIONS**: Activation trigger positions as tuples `(row, col, gate_id)`
   - When a train enters an activation cell, all gates with matching `gate_id` toggle
+- **DSWITCHES**: Dynamic switch positions as tuples `(row, col, dswitch_id)`
+  - `dswitch_id`: Integer identifier linking DSWITCHes to activations
+  - When a train triggers an activation with matching `dswitch_id`, all linked DSWITCHes toggle their routing
+  - DSWITCHes must be pre-placed via `INIT_POS`
+  - All DSWITCHes start in normal (non-swapped) state
 
 ### Track Pieces
 
@@ -168,6 +177,15 @@ ACTIVATIONS=[];         % Activation definitions: (row,col,gate_id)
 - **SWITCH\_\***: 3-way switches with naming pattern `SWITCH_<Single>_<Straight>_<Curve>`
   - Example: `SWITCH_T_D_R` connects TOP→DOWN (straight), DOWN→RIGHT (curve), RIGHT→DOWN
   - Example: `SWITCH_D_T_L` connects DOWN→TOP (straight), TOP→LEFT (curve), LEFT→TOP
+- **DSWITCH\_\***: Dynamic 3-way switches that can reconfigure when activated
+  - Same naming pattern as SWITCH: `DSWITCH_<Single>_<Straight>_<Curve>`
+  - **Normal state**: Behaves like corresponding SWITCH piece
+  - **After activation**: Single and Straight connections swap (Curve unchanged)
+  - Example: `DSWITCH_L_R_D` initially routes LEFT→RIGHT, RIGHT→DOWN, DOWN→RIGHT
+  - After activation: RIGHT→LEFT, LEFT→DOWN, DOWN→LEFT (Single↔Straight swapped)
+  - All DSWITCHes with the same `dswitch_id` toggle together when linked activation is triggered
+  - **Pre-placed only**: DSWITCHes must be placed via `INIT_POS`, not freely by solver
+  - **Zero cost**: DSWITCHes have no cost impact (like tunnels)
 - **TUNNEL\_\***: Tunnel entrances with **directional entry restrictions**
   - `TUNNEL_T`: Can only be entered from TOP, paired tunnel exits in TOP direction
   - `TUNNEL_R`: Can only be entered from RIGHT, paired tunnel exits in RIGHT direction
@@ -198,6 +216,38 @@ GATES=[(1,2,1,false)];        % Gate at (1,2), ID=1, starts CLOSED
 N_ACTIVATIONS=1;
 ACTIVATIONS=[(2,4,1)];        % Activation at (2,4) triggers gate ID=1
 ```
+
+### Dynamic Switches (DSWITCHes)
+
+- **DSWITCHes**: Dynamic 3-way switches that reconfigure when activated
+  - Work like regular switches but can swap their Single and Straight connections
+  - Each DSWITCH has a `dswitch_id` that links it to activations
+  - Multiple DSWITCHes can share the same ID (they toggle together)
+  - All DSWITCHes start in normal (non-swapped) state
+  - When a train triggers a linked activation, DSWITCHes toggle between normal and swapped states
+  - Must be pre-placed via `INIT_POS` (cannot be freely placed by solver)
+
+**Routing behavior:**
+- **Normal state**: Routes like the corresponding SWITCH piece
+  - Example: `DSWITCH_L_R_D` routes LEFT→RIGHT, RIGHT→DOWN, DOWN→RIGHT
+- **Swapped state**: Single and Straight connections swap (Curve unchanged)
+  - Example: `DSWITCH_L_R_D` swapped routes RIGHT→LEFT, LEFT→DOWN, DOWN→LEFT
+
+**Example:**
+
+```minizinc
+N_INIT_POS=1;
+INIT_POS=[(1,3,DSWITCH_L_R_D)];  % Pre-place DSWITCH at (1,3)
+
+N_ACTIVATIONS=1;
+ACTIVATIONS=[(1,2,1)];           % Activation at (1,2) with ID=1
+
+N_DSWITCHES=1;
+DSWITCHES=[(1,3,1)];             % DSWITCH at (1,3) toggles when activation ID=1 is triggered
+```
+
+When a train passes through cell (1,2), it triggers the activation, causing the DSWITCH at (1,3) to swap its routing for all subsequent trains.
+
 
 ## Example Puzzles
 

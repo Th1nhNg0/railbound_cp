@@ -79,6 +79,24 @@
         color: white;
         text-shadow: 1px 1px 2px black;
       }
+      .dswitch-indicator {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 3px solid #9B63CB;
+        background-color: #F5E2FF;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        color: #9B63CB;
+        text-shadow: 0px 0px 1px white;
+      }
     </style>
   </head>
   <body>
@@ -100,6 +118,7 @@
           tunnels,
           gates,
           activations,
+          dswitches,
         } = userData;
 
         const container = document.getElementById("gridContainer");
@@ -374,8 +393,21 @@
                 const activationDiv = document.createElement("div");
                 activationDiv.className = "activation-indicator";
                 activationDiv.textContent = gate_id;
-                activationDiv.title = `Activation for Gate ${gate_id}`;
+                activationDiv.title = `Activation for Gate/DSwitch ${gate_id}`;
                 cell.appendChild(activationDiv);
+              }
+
+              // Add dswitch indicators
+              const dswitch = dswitches?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              if (dswitch) {
+                const [, , dswitch_id] = dswitch;
+                const dswitchDiv = document.createElement("div");
+                dswitchDiv.className = "dswitch-indicator";
+                dswitchDiv.textContent = dswitch_id;
+                dswitchDiv.title = `DSwitch ${dswitch_id} (toggles on activation)`;
+                cell.appendChild(dswitchDiv);
               }
 
               container.appendChild(cell);
