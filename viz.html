@@ -121,10 +121,11 @@
 
         // Load and cache tunnel SVG with color replacement
         let tunnelSvgTemplate = null;
-        fetch("images/Tunnel.svg")
+        const tunnelSvgPromise = fetch("images/Tunnel.svg")
           .then((response) => response.text())
           .then((svgText) => {
             tunnelSvgTemplate = svgText;
+            return svgText;
           });
 
         // Helper to get rotation angle from direction
@@ -354,9 +355,13 @@
               if (gate) {
                 const [, , gate_id, initially_open] = gate;
                 const gateDiv = document.createElement("div");
-                gateDiv.className = `gate-indicator ${initially_open ? 'gate-open' : 'gate-closed'}`;
+                gateDiv.className = `gate-indicator ${
+                  initially_open ? "gate-open" : "gate-closed"
+                }`;
                 gateDiv.textContent = gate_id;
-                gateDiv.title = `Gate ${gate_id}: ${initially_open ? 'Open' : 'Closed'}`;
+                gateDiv.title = `Gate ${gate_id}: ${
+                  initially_open ? "Open" : "Closed"
+                }`;
                 cell.appendChild(gateDiv);
               }
 
@@ -378,6 +383,8 @@
           }
         }
 
+        // Wait for tunnel SVG to load before drawing initial grid
+        await tunnelSvgPromise;
         drawGrid();
 
         function setSolution(data) {
