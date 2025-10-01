@@ -22,6 +22,7 @@ This project models Railbound puzzles as Constraint Satisfaction Problems (CSP) 
   - Straight tracks and corners
   - Switches (3-way junctions)
   - Tunnels (teleportation between paired locations with directional entry restrictions)
+  - Gates and activations (blocking mechanisms with trigger-based toggling)
   - Multiple trains with sequential arrival requirements
   - Collision avoidance (no train-to-train collisions or position swaps)
   - Track budget constraints
@@ -125,6 +126,12 @@ INIT_POS=[
 
 N_TUNNELS=0;            % Number of tunnel pairs
 TUNNEL_PAIRS=[];        % Tunnel definitions: (row1,col1,dir1,row2,col2,dir2)
+
+N_GATES=0;              % Number of gates
+GATES=[];               % Gate definitions: (row,col,gate_id,initially_open)
+
+N_ACTIVATIONS=0;        % Number of activations
+ACTIVATIONS=[];         % Activation definitions: (row,col,gate_id)
 ```
 
 ### Parameters
@@ -137,6 +144,11 @@ TUNNEL_PAIRS=[];        % Tunnel definitions: (row1,col1,dir1,row2,col2,dir2)
   - Directions: `TOP`, `RIGHT`, `DOWN`, `LEFT`
 - **INIT_POS**: Pre-placed pieces on the grid as tuples `(row, col, piece_type)`
 - **TUNNEL_PAIRS**: Paired tunnel endpoints as tuples `(row_A, col_A, dir_A, row_B, col_B, dir_B)`
+- **GATES**: Gate positions as tuples `(row, col, gate_id, initially_open)`
+  - `gate_id`: Integer identifier linking gates to activations
+  - `initially_open`: `true` if gate starts open, `false` if closed
+- **ACTIVATIONS**: Activation trigger positions as tuples `(row, col, gate_id)`
+  - When a train enters an activation cell, all gates with matching `gate_id` toggle
 
 ### Track Pieces
 
@@ -158,16 +170,41 @@ TUNNEL_PAIRS=[];        % Tunnel definitions: (row1,col1,dir1,row2,col2,dir2)
   - Tunnels work bidirectionally - either endpoint can be the entry point
   - When a train enters a tunnel, it teleports to the paired tunnel and exits in the specified direction
 
+### Gates and Activations
+
+- **Gates**: Blocking mechanisms that prevent train movement
+  - Placed on track pieces (straights, corners, or switches)
+  - States: OPEN (trains can pass) or CLOSED (trains cannot enter)
+  - Each gate has a `gate_id` that links it to activations
+  - Multiple gates can share the same ID (they toggle together)
+  
+- **Activations**: Trigger points that toggle gate states
+  - When a train enters an activation cell at time `t`, all gates with matching `gate_id` toggle at time `t+1`
+  - OPEN gates become CLOSED, CLOSED gates become OPEN
+  - Activations can be triggered multiple times
+  - Trains blocked by closed gates will wait in place until the gate opens
+
+**Example:**
+```minizinc
+N_GATES=1;
+GATES=[(1,2,1,false)];        % Gate at (1,2), ID=1, starts CLOSED
+
+N_ACTIVATIONS=1;
+ACTIVATIONS=[(2,4,1)];        % Activation at (2,4) triggers gate ID=1
+```
+
 ## Example Puzzles
 
 The `test/` directory contains several example puzzles:
 
-- `2-1.dzn`: Simple puzzle demonstrating cost optimization (prefers straights over switches)
-- `easy.dzn`: Single-train puzzle
 - `1-3.dzn`: Single train with switches
 - `1-9.dzn`: Two trains requiring coordination
 - `1-11A.dzn`: Three trains with complex routing
+- `2-1.dzn`: Simple puzzle demonstrating cost optimization
 - `2-8.dzn`: Three trains with tunnel teleportation
+- `3-1.dzn`: Basic gate and activation puzzle
+- `3-2.dzn`: Single gate coordination between trains
+- `3-3A.dzn`: Complex gate coordination
 - And more...
 
 ### Running Multiple Tests
@@ -201,11 +238,13 @@ The solver uses constraint programming with optimization to model the puzzle:
 - Trains start at specified positions with initial exit directions
 - Train movement follows track piece routing rules (straights, corners, switches)
 - Tunnel teleportation with directional entry restrictions
+- Gate blocking and train waiting when gates are closed
+- Gate toggling when trains trigger activations
 - Trains must reach the target in sequential order (no overtaking)
 - No collisions between trains (same cell or position swaps)
 - Connectivity validation for corners and switches (all entry points must connect)
 - Respect the track budget (maximum number of placeable pieces)
-- Honor pre-placed pieces and tunnel placements
+- Honor pre-placed pieces, tunnel placements, gates, and activations
 
 ### 3. **Optimization**
 The solver minimizes the total piece cost to prefer simpler solutions:
@@ -219,6 +258,7 @@ This ensures the solver finds the cleanest, most elegant solution rather than ar
 ### Key Implementation Details
 
 - **Tunnel Logic**: Tunnels enforce one-way entry restrictions. When a train enters a tunnel, it instantly appears at the next cell after the paired tunnel, exiting in the paired tunnel's direction.
+- **Gate Blocking**: Trains cannot enter cells with closed gates and will wait in place. When an activation is triggered at time `t`, gates toggle at time `t+1`, allowing blocked trains to proceed.
 - **Switch Routing**: Switches have three connections with specific routing rules based on which direction the train enters.
 - **Collision Avoidance**: Both same-cell occupancy and position-swap collisions are prevented (except at the target cell).
 - **Sequential Arrival**: Trains must arrive at the target in order - later trains cannot reach the target before earlier trains.
@@ -229,23 +269,21 @@ This ensures the solver finds the cleanest, most elegant solution rather than ar
 ```
 railbound_cp/
 ├── railbound.mzn           # Main MiniZinc model (well-documented and refactored)
+├── viz.html                # Interactive visualization for puzzle solutions
 ├── test/                   # Example puzzle data files
-│   ├── 2-1.dzn
-│   ├── easy.dzn
 │   ├── 1-3.dzn
+│   ├── 2-1.dzn
+│   ├── 3-1.dzn            # Gate/activation example
 │   └── ...
 ├── README.md               # This file
-├── OPTIMIZATION_NOTES.md   # Details on cost-based optimization
-├── SOLUTION_SUMMARY.md     # Quick reference for the optimization approach
-└── REFACTORING_SUMMARY.md  # Code refactoring improvements
+└── GATES_ACTIVATIONS_SPEC.md  # Detailed specification for gates feature
 ```
 
 ## Documentation
 
 - **README.md**: Main documentation (this file)
-- **OPTIMIZATION_NOTES.md**: Deep dive into why cost optimization is needed and how it works
-- **SOLUTION_SUMMARY.md**: Quick reference for the cost-based preference system
-- **REFACTORING_SUMMARY.md**: Details on code organization improvements
+- **GATES_ACTIVATIONS_SPEC.md**: Detailed specification for gates and activations feature
+- **viz.html**: Interactive visualization that displays gates (colored circles) and activations (orange squares)
 
 ## Code Quality
 

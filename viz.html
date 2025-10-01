@@ -38,6 +38,47 @@
       .bg-tunnel {
         background-color: #c0c0c0;
       }
+      .gate-indicator {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 3px solid #000;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        color: white;
+        text-shadow: 1px 1px 2px black;
+      }
+      .gate-open {
+        background-color: #00ff00;
+      }
+      .gate-closed {
+        background-color: #ff0000;
+      }
+      .activation-indicator {
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        width: 24px;
+        height: 24px;
+        background-color: #ffaa00;
+        border: 2px solid #000;
+        border-radius: 4px;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        color: white;
+        text-shadow: 1px 1px 2px black;
+      }
     </style>
   </head>
   <body>
@@ -57,6 +98,8 @@
           trains,
           target,
           tunnels,
+          gates,
+          activations,
         } = userData;
 
         const container = document.getElementById("gridContainer");
@@ -302,6 +345,32 @@
                 img.style.transform = `rotate(${rotation}deg)`;
                 img.style.zIndex = "10";
                 cell.appendChild(img);
+              }
+
+              // Add gates
+              const gate = gates?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              if (gate) {
+                const [, , gate_id, initially_open] = gate;
+                const gateDiv = document.createElement("div");
+                gateDiv.className = `gate-indicator ${initially_open ? 'gate-open' : 'gate-closed'}`;
+                gateDiv.textContent = gate_id;
+                gateDiv.title = `Gate ${gate_id}: ${initially_open ? 'Open' : 'Closed'}`;
+                cell.appendChild(gateDiv);
+              }
+
+              // Add activations
+              const activation = activations?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              if (activation) {
+                const [, , gate_id] = activation;
+                const activationDiv = document.createElement("div");
+                activationDiv.className = "activation-indicator";
+                activationDiv.textContent = gate_id;
+                activationDiv.title = `Activation for Gate ${gate_id}`;
+                cell.appendChild(activationDiv);
               }
 
               container.appendChild(cell);
