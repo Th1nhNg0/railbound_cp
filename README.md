@@ -251,33 +251,39 @@ When a train passes through cell (1,2), it triggers the activation, causing the 
 
 ## Example Puzzles
 
-The `test/` directory contains 28 example puzzles from different worlds:
+The `test/` directory contains **82 puzzles** from worlds 1-4 and 8:
 
-### World 1 Puzzles (9 puzzles)
+### World 1 Puzzles (21 puzzles)
 
-- `1-3.dzn`: Single train with switches
-- `1-9.dzn`: Two trains requiring coordination
-- `1-11A.dzn`, `1-11B.dzn`: Three trains with complex routing
-- `1-12.dzn`, `1-12A.dzn`: Multi-train coordination
-- `1-13.dzn`, `1-13A.dzn`: Advanced routing
-- `1-14A.dzn`, `1-15A.dzn`: Complex multi-train puzzles
+Basic mechanics including straights, corners, and switches:
+- `1-1.dzn` to `1-15A.dzn`: Progressive difficulty
+- Introduction to track placement and routing
+- Single and multi-train coordination
 
-### World 2 Puzzles (7 puzzles)
+### World 2 Puzzles (17 puzzles)
 
-- `2-1.dzn`: Simple puzzle demonstrating cost optimization
-- `2-3.dzn`, `2-3B.dzn`: Coordination puzzles
-- `2-5A.dzn`, `2-5B.dzn`: Switch-heavy puzzles
-- `2-8.dzn`: Three trains with tunnel teleportation
-- `2-9.dzn`: Advanced tunnel usage
+Introduces tunnels for teleportation:
+- `2-1.dzn` to `2-9.dzn`: Tunnel mechanics
+- `2-3A.dzn`, `2-3B.dzn`: Multi-train tunnel coordination
+- `2-5A.dzn`, `2-5B.dzn`: Switch and tunnel combinations
+- `2-8.dzn`: Three trains with complex tunnel routing
 
-### World 3 Puzzles (10 puzzles)
+### World 3 Puzzles (20 puzzles)
 
-- `3-1.dzn`: Basic gate and activation puzzle
-- `3-2.dzn`: Single gate coordination between trains
-- `3-3A.dzn`: Complex gate coordination
+Adds gates and activation switches:
+- `3-1.dzn` to `3-11B.dzn`: Gate mechanics
+- `3-2.dzn`, `3-3A.dzn`: Basic gate coordination
 - `3-6.dzn`, `3-7.dzn`, `3-8.dzn`: Advanced gate puzzles
-- `3-10C.dzn`: Challenging puzzle (may require longer solve time)
-- `3-11.dzn`, `3-11B.dzn`: Complex multi-gate scenarios
+- `3-10C.dzn`: Multi-gate challenge with tunnels
+- Gate timing and train sequencing
+
+### World 4 Puzzles (22 puzzles)
+
+Introduces dynamic switches (DSWITCHes):
+- `4-1.dzn` to `4-9B.dzn`: Dynamic switch mechanics
+- `4-3B.dzn`: Multiple dynamic switches
+- Switches that change configuration when activated
+- Complex routing with switch state management
 
 ### World 8 Puzzles (2 puzzles)
 
@@ -408,7 +414,7 @@ Feel free to add more puzzle definitions or improve the model!
 ### Adding New Puzzles
 
 1. Create a new `.dzn` file in the `test/` directory
-2. Define the grid size, trains, and constraints
+2. Define the grid size, trains, and constraints (see `Puzzle Format` section above)
 3. Test with: `minizinc --solver Gecode railbound.mzn test/your-puzzle.dzn`
 
 ### Improving the Model

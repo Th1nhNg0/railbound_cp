@@ -2,7 +2,7 @@ W=6;
 H=5;
 
 MAX_TIME=W*H;
-MAX_TRACKS=9;  
+MAX_TRACKS=9;
 
 TARGET=(5,6);
 
@@ -21,9 +21,13 @@ N_TUNNELS=0;
 TUNNEL_PAIRS=[];
 
 N_GATES=1;
-GATES=[(2,4,1,false)];
+GATES=[
+(2,4,1,false),
+];
 N_ACTIVATIONS=1;
-ACTIVATIONS=[(5,3,1)];
+ACTIVATIONS=[
+(5,3,1),
+];
 
 N_DSWITCHES=0;
 DSWITCHES=[];
