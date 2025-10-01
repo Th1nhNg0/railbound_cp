@@ -1,6 +1,6 @@
 {
     "openFiles": [
-        "test/3-10C.dzn",
+        "test/3-11.dzn",
         "railbound.mzn"
     ],
     "openTab": 0,
@@ -24,6 +24,7 @@
         "test/2-9.dzn",
         "test/3-1.dzn",
         "test/3-10C.dzn",
+        "test/3-11.dzn",
         "test/3-2.dzn",
         "test/3-3A.dzn",
         "test/3-6.dzn",

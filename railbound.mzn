@@ -682,19 +682,6 @@ output [
   "Latest arrival time: \(max(arrival_time))\n"
 ]
 ++
-(if N_GATES > 0 then
-  ["\nGATES:\n"] ++
-  [ "  Gate \(g) at (\(GATES[g].1),\(GATES[g].2)) [id=\(GATES[g].3)]: initially " ++
-    (if GATES[g].4 then "OPEN" else "CLOSED" endif) ++ "\n"
-    | g in 1..N_GATES ]
-else [] endif)
-++
-(if N_ACTIVATIONS > 0 then
-  ["\nACTIVATIONS:\n"] ++
-  [ "  Activation \(a) at (\(ACTIVATIONS[a].1),\(ACTIVATIONS[a].2)) [id=\(ACTIVATIONS[a].3)]\n"
-    | a in 1..N_ACTIVATIONS ]
-else [] endif)
-++
 ["\nTRAIN PATHS:\n"]
 ++
 [
