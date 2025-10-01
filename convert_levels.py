@@ -33,9 +33,9 @@ BOARD_TO_TRACK = {
     10: "SWITCH_T_D_R",  # BOTTOM_RIGHT_TOP_3WAY - or DSWITCH_T_D_R if mod=5
     11: "SWITCH_R_L_D",  # BOTTOM_LEFT_RIGHT_3WAY - confirmed from 1-3
     12: "SWITCH_T_D_L",  # BOTTOM_LEFT_TOP_3WAY
-    13: "SWITCH_L_R_T",  # TOP_RIGHT_LEFT_3WAY - confirmed from existing
+    13: "SWITCH_L_R_T",  # TOP_RIGHT_LEFT_3WAY - enters from right
     14: "SWITCH_D_T_R",  # TOP_RIGHT_BOTTOM_3WAY
-    15: "SWITCH_L_R_T",  # TOP_LEFT_RIGHT_3WAY - or DSWITCH_L_R_T if mod=5
+    15: "SWITCH_R_L_T",  # TOP_LEFT_RIGHT_3WAY - enters from left
     16: "SWITCH_D_T_L",  # TOP_LEFT_BOTTOM_3WAY
     17: "TUNNEL_L",  # LEFT_FACING_TUNNEL
     18: "TUNNEL_R",  # RIGHT_FACING_TUNNEL
