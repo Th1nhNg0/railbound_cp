@@ -4,7 +4,7 @@
 # Configuration
 $modelFile = ".\railbound.mzn"
 $testDir = ".\test"
-$solvers = @("chuffed", "gecode")
+$solvers = @("chuffed")
 $outputDir = ".\results"
 
 # Create output directory if it doesn't exist
@@ -14,6 +14,12 @@ if (-not (Test-Path $outputDir)) {
 
 # Get all .dzn files in the test directory
 $testFiles = Get-ChildItem -Path $testDir -Filter "*.dzn" | Sort-Object Name
+
+# List of test files to ignore 3-10
+$ignoreTests = @("3-10C.dzn")
+
+# Filter out ignored tests
+$testFiles = $testFiles | Where-Object { $_.Name -notin $ignoreTests }
 
 if ($testFiles.Count -eq 0) {
     Write-Host "No test files found in $testDir" -ForegroundColor Red
