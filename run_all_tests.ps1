@@ -4,8 +4,11 @@
 # Configuration
 $modelFile = ".\railbound.mzn"
 $testDir = ".\test"
-$solvers = @("chuffed")
+$solvers = @("cp-sat")
 $outputDir = ".\results"
+# OR-Tools CP-SAT optimized for speed with 4 threads and 60 second timeout
+$parallelFlag = "--parallel"
+$parallelThreads = "4"
 
 # Create output directory if it doesn't exist
 if (-not (Test-Path $outputDir)) {
@@ -49,11 +52,11 @@ foreach ($testFile in $testFiles) {
         $outputFile = Join-Path $outputDir "$($testFile.BaseName)_$($solver)_output.txt"
         
         Write-Host "  Solver: $solver" -ForegroundColor Yellow
-        Write-Host "    Command: minizinc --solver $solver --statistics $modelFile $testPath" -ForegroundColor Gray
+    Write-Host "    Command: minizinc --solver $solver $parallelFlag $parallelThreads --statistics $modelFile $testPath" -ForegroundColor Gray
         
         # Run MiniZinc and capture output
         try {
-            $output = & minizinc --solver $solver --statistics $modelFile $testPath 2>&1
+            $output = & minizinc --solver $solver $parallelFlag $parallelThreads --statistics $modelFile $testPath 2>&1
             $exitCode = $LASTEXITCODE
             
             # Save output to file
@@ -71,30 +74,27 @@ foreach ($testFile in $testFiles) {
                 $duration = [math]::Round([double]$matches[1], 3)
             }
             
-            # Extract additional statistics
-            $nodes = if ($outputText -match "%%%mzn-stat: nodes=(\d+)") { $matches[1] } else { "N/A" }
-            $failures = if ($outputText -match "%%%mzn-stat: failures=(\d+)") { $matches[1] } else { "N/A" }
-            $propagations = if ($outputText -match "%%%mzn-stat: propagations=(\d+)") { $matches[1] } else { "N/A" }
-            $peakDepth = if ($outputText -match "%%%mzn-stat: peakDepth=(\d+)") { $matches[1] } else { "N/A" }
-            $restarts = if ($outputText -match "%%%mzn-stat: restarts=(\d+)") { $matches[1] } else { "N/A" }
-            $objective = if ($outputText -match "%%%mzn-stat: objective=(\d+)") { $matches[1] } else { "N/A" }
-            $variables = if ($outputText -match "%%%mzn-stat: variables=(\d+)") { $matches[1] } else { "N/A" }
-            $intVars = if ($outputText -match "%%%mzn-stat: intVars=(\d+)") { $matches[1] } else { "N/A" }
-            $boolVariables = if ($outputText -match "%%%mzn-stat: boolVariables=(\d+)") { $matches[1] } else { "N/A" }
+            # Extract additional statistics (only include fields that exist in output)
+            $failures = if ($outputText -match "%%%mzn-stat: failures=(\d+)") { $matches[1] } else { "" }
+            $propagations = if ($outputText -match "%%%mzn-stat: propagations=(\d+)") { $matches[1] } else { "" }
+            $objective = if ($outputText -match "%%%mzn-stat: objective=(\d+)") { $matches[1] } else { "" }
+            $boolVariables = if ($outputText -match "%%%mzn-stat: boolVariables=(\d+)") { $matches[1] } else { "" }
+            $nSolutions = if ($outputText -match "%%%mzn-stat: nSolutions=(\d+)") { $matches[1] } else { "" }
+            $objectiveBound = if ($outputText -match "%%%mzn-stat: objectiveBound=(\d+)") { $matches[1] } else { "" }
             
             if ($isUnsatisfiable) {
                 Write-Host "    Status: CAN'T SOLVE (UNSATISFIABLE)" -ForegroundColor Magenta
-                Write-Host "    Duration: $($duration)s | Nodes: $nodes | Failures: $failures | Vars: $variables" -ForegroundColor Gray
+                Write-Host "    Duration: $($duration)s | Failures: $failures | BoolVars: $boolVariables | Propagations: $propagations" -ForegroundColor Gray
                 $successCount++
                 $status = "CAN'T SOLVE"
             } elseif ($exitCode -eq 0) {
                 Write-Host "    Status: SUCCESS" -ForegroundColor Green
-                Write-Host "    Duration: $($duration)s | Nodes: $nodes | Failures: $failures | Vars: $variables | Objective: $objective" -ForegroundColor Gray
+                Write-Host "    Duration: $($duration)s | Failures: $failures | BoolVars: $boolVariables | Propagations: $propagations | Objective: $objective" -ForegroundColor Gray
                 $successCount++
                 $status = "SUCCESS"
             } else {
                 Write-Host "    Status: FAILED (exit code: $exitCode)" -ForegroundColor Red
-                Write-Host "    Duration: $($duration)s | Nodes: $nodes | Failures: $failures | Vars: $variables" -ForegroundColor Gray
+                Write-Host "    Duration: $($duration)s | Failures: $failures | BoolVars: $boolVariables | Propagations: $propagations" -ForegroundColor Gray
                 $failCount++
                 $status = "FAILED"
             }
@@ -104,15 +104,12 @@ foreach ($testFile in $testFiles) {
                 Solver = $solver
                 Status = $status
                 Duration = $duration
-                Nodes = $nodes
                 Failures = $failures
-                Variables = $variables
-                IntVars = $intVars
                 BoolVars = $boolVariables
                 Propagations = $propagations
-                PeakDepth = $peakDepth
-                Restarts = $restarts
+                NSolutions = $nSolutions
                 Objective = $objective
+                ObjectiveBound = $objectiveBound
                 ExitCode = $exitCode
             }
         }
@@ -124,15 +121,12 @@ foreach ($testFile in $testFiles) {
                 Solver = $solver
                 Status = "ERROR"
                 Duration = 0
-                Nodes = "N/A"
-                Failures = "N/A"
-                Variables = "N/A"
-                IntVars = "N/A"
-                BoolVars = "N/A"
-                Propagations = "N/A"
-                PeakDepth = "N/A"
-                Restarts = "N/A"
-                Objective = "N/A"
+                Failures = ""
+                BoolVars = ""
+                Propagations = ""
+                NSolutions = ""
+                Objective = ""
+                ObjectiveBound = ""
                 ExitCode = -1
             }
         }
