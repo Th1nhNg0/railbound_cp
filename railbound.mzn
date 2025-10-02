@@ -765,18 +765,16 @@ constraint forall(t in 1..N_TRAINS, g in 1..N_GATES) (
 );
 
 % 19) Gate state transitions: toggle when activation is triggered
-%     Activations only trigger on ENTRY (when train wasn't there previous timestep)
+%     Activations trigger if odd number of trains enter activations linked to the gate
 constraint forall(g in 1..N_GATES, time in 0..MAX_TIME-1) (
   let {
     int: gate_id = GATES[g].3;
-    % Check if any train ENTERS an activation point at this time
-    % (is at activation at time, but wasn't there at time-1)
-    var bool: activation_triggered = exists(t in 1..N_TRAINS, a in ACTIVATIONS where a.3 = gate_id) (
-      train_row[t, time] = a.1 /\ train_col[t, time] = a.2 /\
-      (time = 0 \/ (train_row[t, time-1] != a.1 \/ train_col[t, time-1] != a.2))
+    var int: num_entering = sum(t in 1..N_TRAINS, a in ACTIVATIONS where a.3 = gate_id) (
+      bool2int( train_row[t, time] = a.1 /\ train_col[t, time] = a.2 /\
+      (time = 0 \/ (train_row[t, time-1] != a.1 \/ train_col[t, time-1] != a.2)) )
     );
   } in
-  if activation_triggered then
+  if num_entering mod 2 = 1 then
     gate_open[g, time+1] = not gate_open[g, time]  % Toggle
   else
     gate_open[g, time+1] = gate_open[g, time]      % No change
@@ -809,19 +807,17 @@ constraint forall(ds in 1..N_DSWITCHES) (
 );
 
 % 24) DSWITCH state transitions: toggle when linked activation is triggered
-%     Activations only trigger on ENTRY (when train wasn't there previous timestep)
+%     Activations trigger if odd number of trains enter activations linked to the dswitch
 %     All DSWITCHes with the same ID toggle together
 constraint forall(ds in 1..N_DSWITCHES, time in 0..MAX_TIME-1) (
   let {
     int: dswitch_id = DSWITCHES[ds].3;
-    % Check if any train ENTERS an activation point at this time
-    % (is at activation at time, but wasn't there at time-1)
-    var bool: activation_triggered = exists(t in 1..N_TRAINS, a in ACTIVATIONS where a.3 = dswitch_id) (
-      train_row[t, time] = a.1 /\ train_col[t, time] = a.2 /\
-      (time = 0 \/ (train_row[t, time-1] != a.1 \/ train_col[t, time-1] != a.2))
+    var int: num_entering = sum(t in 1..N_TRAINS, a in ACTIVATIONS where a.3 = dswitch_id) (
+      bool2int( train_row[t, time] = a.1 /\ train_col[t, time] = a.2 /\
+      (time = 0 \/ (train_row[t, time-1] != a.1 \/ train_col[t, time-1] != a.2)) )
     );
   } in
-  if activation_triggered then
+  if num_entering mod 2 = 1 then
     dswitch_swapped[ds, time+1] = not dswitch_swapped[ds, time]  % Toggle
   else
     dswitch_swapped[ds, time+1] = dswitch_swapped[ds, time]      % No change

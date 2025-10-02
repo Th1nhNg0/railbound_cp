@@ -1,9 +1,10 @@
 {
     "openFiles": [
         "railbound.mzn",
-        "test/3-6.dzn"
+        "test/4-9B.dzn",
+        "test/4-9A.dzn"
     ],
-    "openTab": 1,
+    "openTab": 2,
     "projectFiles": [
         "railbound.mzn",
         "test/1-1.dzn",
@@ -89,7 +90,7 @@
         "test/8-1.dzn",
         "test/8-2.dzn"
     ],
-    "selectedBuiltinConfigId": "org.chuffed.chuffed",
-    "selectedBuiltinConfigVersion": "0.13.2",
+    "selectedBuiltinConfigId": "cp-sat",
+    "selectedBuiltinConfigVersion": "9.12.4544",
     "version": 106
 }
