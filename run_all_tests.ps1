@@ -65,12 +65,23 @@ foreach ($testFile in $testFiles) {
         $outputFile = Join-Path $outputDir "$($testFile.BaseName)_$($solver)_output.txt"
         
         Write-Host "  Solver: $solver" -ForegroundColor Yellow
-        Write-Host "    Command: minizinc --solver $solver $parallelFlag $parallelThreads --statistics --time-limit $($timeLimitMs) $modelFile $testPath" -ForegroundColor Gray
+        
+        # Build command with -f only for chuffed
+        $command = "minizinc --solver $solver"
+        if ($solver -eq "chuffed") {
+            $command += " -f"
+        }
+        $command += " $parallelFlag $parallelThreads --statistics --time-limit $($timeLimitMs) $modelFile $testPath"
+        
+        Write-Host "    Command: $command" -ForegroundColor Gray
         
         # Run MiniZinc and capture output
         try {
-            $output = & minizinc --solver $solver $parallelFlag $parallelThreads --statistics --time-limit $($timeLimitMs) $modelFile $testPath 2>&1
+            $measured = Measure-Command {
+                $output = Invoke-Expression $command 2>&1
+            }
             $exitCode = $LASTEXITCODE
+            $duration = [math]::Round($measured.TotalSeconds, 3)
             
             # Save output to file
             $output | Out-File -FilePath $outputFile -Encoding utf8
@@ -81,13 +92,7 @@ foreach ($testFile in $testFiles) {
             $isUnknown = $outputText -match "=====UNKNOWN====="
             $isTimeout = $outputText -match "% Time limit exceeded!"
             
-            # Extract solving time from statistics (already in seconds)
-            $duration = 0
-            if ($outputText -match "%%%mzn-stat: solveTime=(\d+\.?\d*)") {
-                $duration = [math]::Round([double]$matches[1], 3)
-            } elseif ($outputText -match "%%%mzn-stat: time=(\d+\.?\d*)") {
-                $duration = [math]::Round([double]$matches[1], 3)
-            }
+            # Extract additional statistics (only include fields that exist in output)
             
             # Extract additional statistics (only include fields that exist in output)
             $failures = if ($outputText -match "%%%mzn-stat: failures=(\d+)") { $matches[1] } else { "N/A" }
