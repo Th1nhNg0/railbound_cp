@@ -8,7 +8,7 @@ param(
 # Configuration
 $modelFile = ".\railbound.mzn"
 $testDir = ".\test"
-$solvers = @("cp-sat", "chuffed")
+$solvers = @("chuffed")
 $outputDir = ".\results"
 # OR-Tools CP-SAT optimized for speed with 4 threads and 15 second timeout
 $parallelFlag = "--parallel"
