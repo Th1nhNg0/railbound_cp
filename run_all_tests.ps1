@@ -1,10 +1,14 @@
 # PowerShell script to run MiniZinc on all test files with Chuffed solver
-# Usage: .\run_all_tests.ps1
+# Usage: .\run_all_tests.ps1 [-TestCount <number>]
+
+param(
+    [int]$TestCount
+)
 
 # Configuration
 $modelFile = ".\railbound.mzn"
 $testDir = ".\test"
-$solvers = @("cp-sat")
+$solvers = @("chuffed")
 $outputDir = ".\results"
 # OR-Tools CP-SAT optimized for speed with 4 threads and 60 second timeout
 $parallelFlag = "--parallel"
@@ -23,6 +27,14 @@ $ignoreTests = @("3-10C.dzn")
 
 # Filter out ignored tests
 $testFiles = $testFiles | Where-Object { $_.Name -notin $ignoreTests }
+
+# If TestCount not provided, run all tests
+if (-not $PSBoundParameters.ContainsKey('TestCount')) {
+    $TestCount = $testFiles.Count
+}
+
+# Take only the first N tests
+$testFiles = $testFiles | Select-Object -First $TestCount
 
 if ($testFiles.Count -eq 0) {
     Write-Host "No test files found in $testDir" -ForegroundColor Red

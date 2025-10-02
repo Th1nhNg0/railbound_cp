@@ -683,21 +683,20 @@ constraint
   } in
   total_placed_tracks - init_tracks - init_tunnels <= MAX_TRACKS;
 
-% 10) Connectivity: corners/switches/dswitches must connect to valid neighbors
-%     Each entry point of a corner, switch, or dswitch must connect to:
+% 10) Connectivity: corners/switches/dswitches/straights must connect to valid neighbors
+%     Each entry point of a corner, switch, dswitch, or straight must connect to:
 %     - A non-EMPTY cell within bounds
 %     - A cell that can be entered from the opposite direction
 %     - OR a tunnel (tunnels have special teleportation logic)
+%     Exception: straights at target location or initial train positions are exempt
 constraint forall(r in 1..H, c in 1..W) (
-  let { var Piece: p = grid[r, c] } in
-  if p in CORNERS \/ p in SWITCHES \/ p in DSWITCHES_SET then
+  let { var Piece: p = grid[r, c]; } in
+  if p in (CORNERS union SWITCHES union DSWITCHES_SET union STRAIGHTS) /\
+     not (exists(i in 1..N_INIT_POS) (r = INIT_POS[i].1 /\ c = INIT_POS[i].2) \/ 
+          (p in STRAIGHTS /\ r = TARGET.1 /\ c = TARGET.2)) then
     forall(d in Dir where can_enter[p, d]) (
-      let { 
-        int: rr = r + dr[d];
-        int: cc = c + dc[d];
-      } in
-      in_bounds(rr, cc) /\ 
-      grid[rr, cc] != EMPTY /\ 
+      let { int: rr = r + dr[d]; int: cc = c + dc[d]; } in
+      in_bounds(rr, cc) /\ grid[rr, cc] != EMPTY /\
       (grid[rr, cc] in TUNNELS \/ can_enter[grid[rr, cc], opposite[d]])
     )
   endif
@@ -832,41 +831,41 @@ constraint forall(ds in 1..N_DSWITCHES, time in 0..MAX_TIME-1) (
 
 % ========= SOLVE & OUTPUT ===================================
 
-% Optimization: prefer simpler pieces
-% Assign costs based on piece complexity to guide the solver toward cleaner solutions
-array[Piece] of int: piece_cost = [
-  0,  % EMPTY
-  1,  % STRAIGHT_TD
-  1,  % STRAIGHT_RL
-  2,  % CORNER_TR
-  2,  % CORNER_TL
-  2,  % CORNER_DR
-  2,  % CORNER_DL
-  3,  % SWITCH_T_D_R
-  3,  % SWITCH_T_D_L
-  3,  % SWITCH_D_T_R
-  3,  % SWITCH_D_T_L
-  3,  % SWITCH_R_L_T
-  3,  % SWITCH_R_L_D
-  3,  % SWITCH_L_R_T
-  3,  % SWITCH_L_R_D
-  0,  % DSWITCH_T_D_R (pre-placed only, no cost)
-  0,  % DSWITCH_T_D_L (pre-placed only, no cost)
-  0,  % DSWITCH_D_T_R (pre-placed only, no cost)
-  0,  % DSWITCH_D_T_L (pre-placed only, no cost)
-  0,  % DSWITCH_R_L_T (pre-placed only, no cost)
-  0,  % DSWITCH_R_L_D (pre-placed only, no cost)
-  0,  % DSWITCH_L_R_T (pre-placed only, no cost)
-  0,  % DSWITCH_L_R_D (pre-placed only, no cost)
-  0,  % TUNNEL_T (fixed, no cost)
-  0,  % TUNNEL_R (fixed, no cost)
-  0,  % TUNNEL_D (fixed, no cost)
-  0   % TUNNEL_L (fixed, no cost)
-];
+% % Optimization: prefer simpler pieces
+% % Assign costs based on piece complexity to guide the solver toward cleaner solutions
+% array[Piece] of int: piece_cost = [
+%   0,  % EMPTY
+%   1,  % STRAIGHT_TD
+%   1,  % STRAIGHT_RL
+%   2,  % CORNER_TR
+%   2,  % CORNER_TL
+%   2,  % CORNER_DR
+%   2,  % CORNER_DL
+%   3,  % SWITCH_T_D_R
+%   3,  % SWITCH_T_D_L
+%   3,  % SWITCH_D_T_R
+%   3,  % SWITCH_D_T_L
+%   3,  % SWITCH_R_L_T
+%   3,  % SWITCH_R_L_D
+%   3,  % SWITCH_L_R_T
+%   3,  % SWITCH_L_R_D
+%   0,  % DSWITCH_T_D_R (pre-placed only, no cost)
+%   0,  % DSWITCH_T_D_L (pre-placed only, no cost)
+%   0,  % DSWITCH_D_T_R (pre-placed only, no cost)
+%   0,  % DSWITCH_D_T_L (pre-placed only, no cost)
+%   0,  % DSWITCH_R_L_T (pre-placed only, no cost)
+%   0,  % DSWITCH_R_L_D (pre-placed only, no cost)
+%   0,  % DSWITCH_L_R_T (pre-placed only, no cost)
+%   0,  % DSWITCH_L_R_D (pre-placed only, no cost)
+%   0,  % TUNNEL_T (fixed, no cost)
+%   0,  % TUNNEL_R (fixed, no cost)
+%   0,  % TUNNEL_D (fixed, no cost)
+%   0   % TUNNEL_L (fixed, no cost)
+% ];
 
-var int: total_cost = sum(r in 1..H, c in 1..W)(piece_cost[grid[r,c]]);
+% var int: total_cost = sum(r in 1..H, c in 1..W)(piece_cost[grid[r,c]]);
 
-solve minimize total_cost;
+solve satisfy;
 
 % Display results with visualization
 include "ide/vis.mzn"; 
@@ -895,7 +894,6 @@ output [
   "============================================================\n\n",
   "GRID LAYOUT:\n",
   show2d(grid), "\n\n",
-  "Total piece cost: \(total_cost) (straights=1, corners=2, switches=3)\n",
   "Latest arrival time: \(max(arrival_time))\n"
 ]
 ++
