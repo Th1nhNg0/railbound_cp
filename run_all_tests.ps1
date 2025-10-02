@@ -201,7 +201,7 @@ $markdown += "- **Status**: Outcome of the solving process (SUCCESS, TIMEOUT, et
 $markdown += "- **Duration**: Time taken to solve the problem (seconds)`n`n`n"
 
 $markdown += "## Combined Results`n`n"
-$tableProperties = @("Test", "Solver", "Status", "Duration")
+$tableProperties = @("Test", "Solver", "Status", "Duration", "Propagations")
 
 $markdown += "| " + ($tableProperties -join " | ") + " |`n"
 $markdown += "| " + ("--- |" * $tableProperties.Count) + "`n"
@@ -212,6 +212,3 @@ foreach ($result in $results) {
 
 $markdown | Out-File -FilePath $markdownFile -Encoding utf8
 Write-Host "Markdown results saved to: $markdownFile" -ForegroundColor White
-$resultsFile = Join-Path $outputDir "test_results.csv"
-$results | Export-Csv -Path $resultsFile -NoTypeInformation
-Write-Host "Results saved to: $resultsFile" -ForegroundColor White
