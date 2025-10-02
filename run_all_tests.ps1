@@ -8,11 +8,12 @@ param(
 # Configuration
 $modelFile = ".\railbound.mzn"
 $testDir = ".\test"
-$solvers = @("chuffed")
+$solvers = @("cp-sat", "chuffed")
 $outputDir = ".\results"
-# OR-Tools CP-SAT optimized for speed with 4 threads and 60 second timeout
+# OR-Tools CP-SAT optimized for speed with 4 threads and 15 second timeout
 $parallelFlag = "--parallel"
-$parallelThreads = "4"
+$parallelThreads = "8"
+$timeLimitMs = 600000  # Time limit in milliseconds
 
 # Create output directory if it doesn't exist
 if (-not (Test-Path $outputDir)) {
@@ -64,19 +65,21 @@ foreach ($testFile in $testFiles) {
         $outputFile = Join-Path $outputDir "$($testFile.BaseName)_$($solver)_output.txt"
         
         Write-Host "  Solver: $solver" -ForegroundColor Yellow
-    Write-Host "    Command: minizinc --solver $solver $parallelFlag $parallelThreads --statistics $modelFile $testPath" -ForegroundColor Gray
+        Write-Host "    Command: minizinc --solver $solver $parallelFlag $parallelThreads --statistics --time-limit $($timeLimitMs) $modelFile $testPath" -ForegroundColor Gray
         
         # Run MiniZinc and capture output
         try {
-            $output = & minizinc --solver $solver $parallelFlag $parallelThreads --statistics $modelFile $testPath 2>&1
+            $output = & minizinc --solver $solver $parallelFlag $parallelThreads --statistics --time-limit $($timeLimitMs) $modelFile $testPath 2>&1
             $exitCode = $LASTEXITCODE
             
             # Save output to file
             $output | Out-File -FilePath $outputFile -Encoding utf8
             
-            # Check if output contains UNSATISFIABLE
+            # Check if output contains UNSATISFIABLE or UNKNOWN
             $outputText = $output | Out-String
             $isUnsatisfiable = $outputText -match "=====UNSATISFIABLE====="
+            $isUnknown = $outputText -match "=====UNKNOWN====="
+            $isTimeout = $outputText -match "% Time limit exceeded!"
             
             # Extract solving time from statistics (already in seconds)
             $duration = 0
@@ -87,18 +90,29 @@ foreach ($testFile in $testFiles) {
             }
             
             # Extract additional statistics (only include fields that exist in output)
-            $failures = if ($outputText -match "%%%mzn-stat: failures=(\d+)") { $matches[1] } else { "" }
-            $propagations = if ($outputText -match "%%%mzn-stat: propagations=(\d+)") { $matches[1] } else { "" }
-            $objective = if ($outputText -match "%%%mzn-stat: objective=(\d+)") { $matches[1] } else { "" }
-            $boolVariables = if ($outputText -match "%%%mzn-stat: boolVariables=(\d+)") { $matches[1] } else { "" }
-            $nSolutions = if ($outputText -match "%%%mzn-stat: nSolutions=(\d+)") { $matches[1] } else { "" }
-            $objectiveBound = if ($outputText -match "%%%mzn-stat: objectiveBound=(\d+)") { $matches[1] } else { "" }
+            $failures = if ($outputText -match "%%%mzn-stat: failures=(\d+)") { $matches[1] } else { "N/A" }
+            $propagations = if ($outputText -match "%%%mzn-stat: propagations=(\d+)") { $matches[1] } else { "N/A" }
+            $objective = if ($outputText -match "%%%mzn-stat: objective=(\d+)") { $matches[1] } else { "N/A" }
+            $boolVariables = if ($outputText -match "%%%mzn-stat: boolVariables=(\d+)") { $matches[1] } else { "N/A" }
+            $nSolutions = if ($outputText -match "%%%mzn-stat: nSolutions=(\d+)") { $matches[1] } else { "N/A" }
+            $objectiveBound = if ($outputText -match "%%%mzn-stat: objectiveBound=(\d+)") { $matches[1] } else { "N/A" }
+            $nodes = if ($outputText -match "%%%mzn-stat: nodes=(\d+)") { $matches[1] } else { "N/A" }
+            $restarts = if ($outputText -match "%%%mzn-stat: restarts=(\d+)") { $matches[1] } else { "N/A" }
+            $variables = if ($outputText -match "%%%mzn-stat: variables=(\d+)") { $matches[1] } else { "N/A" }
+            $intVars = if ($outputText -match "%%%mzn-stat: intVars=(\d+)") { $matches[1] } else { "N/A" }
+            $propagators = if ($outputText -match "%%%mzn-stat: propagators=(\d+)") { $matches[1] } else { "N/A" }
+            $peakDepth = if ($outputText -match "%%%mzn-stat: peakDepth=(\d+)") { $matches[1] } else { "N/A" }
             
             if ($isUnsatisfiable) {
                 Write-Host "    Status: CAN'T SOLVE (UNSATISFIABLE)" -ForegroundColor Magenta
                 Write-Host "    Duration: $($duration)s | Failures: $failures | BoolVars: $boolVariables | Propagations: $propagations" -ForegroundColor Gray
                 $successCount++
                 $status = "CAN'T SOLVE"
+            } elseif ($isTimeout -or $isUnknown) {
+                Write-Host "    Status: TIMEOUT" -ForegroundColor Yellow
+                Write-Host "    Duration: $($duration)s | Failures: $failures | BoolVars: $boolVariables | Propagations: $propagations" -ForegroundColor Gray
+                $failCount++
+                $status = "TIMEOUT"
             } elseif ($exitCode -eq 0) {
                 Write-Host "    Status: SUCCESS" -ForegroundColor Green
                 Write-Host "    Duration: $($duration)s | Failures: $failures | BoolVars: $boolVariables | Propagations: $propagations | Objective: $objective" -ForegroundColor Gray
@@ -122,6 +136,12 @@ foreach ($testFile in $testFiles) {
                 NSolutions = $nSolutions
                 Objective = $objective
                 ObjectiveBound = $objectiveBound
+                Nodes = $nodes
+                Restarts = $restarts
+                Variables = $variables
+                IntVars = $intVars
+                Propagators = $propagators
+                PeakDepth = $peakDepth
                 ExitCode = $exitCode
             }
         }
@@ -160,7 +180,33 @@ Write-Host ""
 # Display results table
 $results | Format-Table -AutoSize
 
-# Save results to CSV
+# Generate Markdown
+$markdownFile = Join-Path $outputDir "test_results.md"
+$markdown = "# MiniZinc Test Results`n"
+$markdown += "Model: $modelFile`n"
+$markdown += "Solvers: $($solvers -join ', ')`n"
+$markdown += "Total tests: $($testFiles.Count * $solvers.Count)`n"
+$markdown += "Successful: $successCount`n"
+$markdown += "Failed: $failCount`n`n"
+
+$markdown += "## Column Explanations`n`n"
+$markdown += "- **Test**: The test case file name`n"
+$markdown += "- **Solver**: The constraint solver used`n"
+$markdown += "- **Status**: Outcome of the solving process (SUCCESS, TIMEOUT, etc.)`n"
+$markdown += "- **Duration**: Time taken to solve the problem (seconds)`n`n`n"
+
+$markdown += "## Combined Results`n`n"
+$tableProperties = @("Test", "Solver", "Status", "Duration")
+
+$markdown += "| " + ($tableProperties -join " | ") + " |`n"
+$markdown += "| " + ("--- |" * $tableProperties.Count) + "`n"
+foreach ($result in $results) {
+    $rowValues = $tableProperties | ForEach-Object { $result.$_ }
+    $markdown += "| " + ($rowValues -join " | ") + " |`n"
+}
+
+$markdown | Out-File -FilePath $markdownFile -Encoding utf8
+Write-Host "Markdown results saved to: $markdownFile" -ForegroundColor White
 $resultsFile = Join-Path $outputDir "test_results.csv"
 $results | Export-Csv -Path $resultsFile -NoTypeInformation
 Write-Host "Results saved to: $resultsFile" -ForegroundColor White

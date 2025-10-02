@@ -147,7 +147,7 @@ DSWITCHES=[];           % DSwitch definitions: (row,col,dswitch_id)
 ### Parameters
 
 - **W, H**: Grid dimensions (columns × rows)
-- **MAX_TIME**: Maximum number of time steps for simulation
+- **MAX_TIME**: Maximum number of time steps for simulation (Note: Setting MAX_TIME low will make the solver run faster but may prevent finding a solution. To find the correct value, try setting it to MAX_TRACKS + 1, then +2, etc., incrementing each time until a solution is found)
 - **MAX_TRACKS**: Maximum number of non-EMPTY track pieces that can be placed (excluding pre-placed pieces)
 - **TARGET_R, TARGET_C**: The destination cell all trains must reach
 - **TRAINS**: Array of train starting positions as tuples `(row, col, direction)`
@@ -228,6 +228,7 @@ ACTIVATIONS=[(2,4,1)];        % Activation at (2,4) triggers gate ID=1
   - Must be pre-placed via `INIT_POS` (cannot be freely placed by solver)
 
 **Routing behavior:**
+
 - **Normal state**: Routes like the corresponding SWITCH piece
   - Example: `DSWITCH_L_R_D` routes LEFT→RIGHT, RIGHT→DOWN, DOWN→RIGHT
 - **Swapped state**: Single and Straight connections swap (Curve unchanged)
@@ -248,7 +249,6 @@ DSWITCHES=[(1,3,1)];             % DSWITCH at (1,3) toggles when activation ID=1
 
 When a train passes through cell (1,2), it triggers the activation, causing the DSWITCH at (1,3) to swap its routing for all subsequent trains.
 
-
 ## Example Puzzles
 
 The `test/` directory contains **82 puzzles** from worlds 1-4 and 8:
@@ -256,6 +256,7 @@ The `test/` directory contains **82 puzzles** from worlds 1-4 and 8:
 ### World 1 Puzzles (21 puzzles)
 
 Basic mechanics including straights, corners, and switches:
+
 - `1-1.dzn` to `1-15A.dzn`: Progressive difficulty
 - Introduction to track placement and routing
 - Single and multi-train coordination
@@ -263,6 +264,7 @@ Basic mechanics including straights, corners, and switches:
 ### World 2 Puzzles (17 puzzles)
 
 Introduces tunnels for teleportation:
+
 - `2-1.dzn` to `2-9.dzn`: Tunnel mechanics
 - `2-3A.dzn`, `2-3B.dzn`: Multi-train tunnel coordination
 - `2-5A.dzn`, `2-5B.dzn`: Switch and tunnel combinations
@@ -271,6 +273,7 @@ Introduces tunnels for teleportation:
 ### World 3 Puzzles (20 puzzles)
 
 Adds gates and activation switches:
+
 - `3-1.dzn` to `3-11B.dzn`: Gate mechanics
 - `3-2.dzn`, `3-3A.dzn`: Basic gate coordination
 - `3-6.dzn`, `3-7.dzn`, `3-8.dzn`: Advanced gate puzzles
@@ -280,6 +283,7 @@ Adds gates and activation switches:
 ### World 4 Puzzles (22 puzzles)
 
 Introduces dynamic switches (DSWITCHes):
+
 - `4-1.dzn` to `4-9B.dzn`: Dynamic switch mechanics
 - `4-3B.dzn`: Multiple dynamic switches
 - Switches that change configuration when activated

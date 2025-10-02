@@ -827,41 +827,11 @@ constraint forall(ds in 1..N_DSWITCHES, time in 0..MAX_TIME-1) (
 
 % ========= SOLVE & OUTPUT ===================================
 
-% % Optimization: prefer simpler pieces
-% % Assign costs based on piece complexity to guide the solver toward cleaner solutions
-% array[Piece] of int: piece_cost = [
-%   0,  % EMPTY
-%   1,  % STRAIGHT_TD
-%   1,  % STRAIGHT_RL
-%   2,  % CORNER_TR
-%   2,  % CORNER_TL
-%   2,  % CORNER_DR
-%   2,  % CORNER_DL
-%   3,  % SWITCH_T_D_R
-%   3,  % SWITCH_T_D_L
-%   3,  % SWITCH_D_T_R
-%   3,  % SWITCH_D_T_L
-%   3,  % SWITCH_R_L_T
-%   3,  % SWITCH_R_L_D
-%   3,  % SWITCH_L_R_T
-%   3,  % SWITCH_L_R_D
-%   0,  % DSWITCH_T_D_R (pre-placed only, no cost)
-%   0,  % DSWITCH_T_D_L (pre-placed only, no cost)
-%   0,  % DSWITCH_D_T_R (pre-placed only, no cost)
-%   0,  % DSWITCH_D_T_L (pre-placed only, no cost)
-%   0,  % DSWITCH_R_L_T (pre-placed only, no cost)
-%   0,  % DSWITCH_R_L_D (pre-placed only, no cost)
-%   0,  % DSWITCH_L_R_T (pre-placed only, no cost)
-%   0,  % DSWITCH_L_R_D (pre-placed only, no cost)
-%   0,  % TUNNEL_T (fixed, no cost)
-%   0,  % TUNNEL_R (fixed, no cost)
-%   0,  % TUNNEL_D (fixed, no cost)
-%   0   % TUNNEL_L (fixed, no cost)
-% ];
-
-% var int: total_cost = sum(r in 1..H, c in 1..W)(piece_cost[grid[r,c]]);
-
-solve satisfy;
+solve:: int_search([grid[r,c] | r in 1..H, c in 1..W],
+                    first_fail, indomain_min, complete)
+     :: int_search([arrival_time[t] | t in 1..N_TRAINS],
+                    first_fail, indomain_min, complete)
+     satisfy;
 
 % Display results with visualization
 include "ide/vis.mzn"; 

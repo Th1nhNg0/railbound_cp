@@ -1,10 +1,8 @@
 {
     "openFiles": [
-        "railbound.mzn",
-        "test/4-9B.dzn",
-        "test/4-9A.dzn"
+        "railbound.mzn"
     ],
-    "openTab": 2,
+    "openTab": 0,
     "projectFiles": [
         "railbound.mzn",
         "test/1-1.dzn",
