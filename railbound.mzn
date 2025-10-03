@@ -912,8 +912,8 @@ solve:: int_search([grid[r,c] | r in 1..H, c in 1..W],
                     first_fail, indomain_min, complete)
      :: int_search([arrival_time[t] | t in 1..N_TRAINS],
                     first_fail, indomain_min, complete)
-     satisfy;
-
+%     satisfy;
+  minimize max(arrival_time);
 % Display results with visualization
 include "ide/vis.mzn"; 
 
