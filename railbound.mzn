@@ -182,6 +182,64 @@ array[Dir] of int: dr = [ -1,  0,  1,  0 ];  % Row deltas: TOP, RIGHT, DOWN, LEF
 array[Dir] of int: dc = [  0,  1,  0, -1 ];  % Col deltas
 array[Dir] of Dir: opposite = [ DOWN, LEFT, TOP, RIGHT ];
 
+% --- Precomputed cell lookups for faster propagation ---
+int: GATE_INDEX_UPPER = if N_GATES = 0 then 1 else N_GATES endif;
+array[1..H, 1..W] of 1..GATE_INDEX_UPPER: gate_index_at =
+  array2d(1..H, 1..W, [
+    let {
+      int: g_idx = if N_GATES = 0 then 0
+                   else sum(g in 1..N_GATES where GATES[g].1 = r /\ GATES[g].2 = c)(g)
+                   endif;
+    } in
+      if g_idx > 0 then g_idx else 1 endif
+  | r in 1..H, c in 1..W
+  ]);
+
+array[1..H, 1..W] of bool: cell_has_gate =
+  array2d(1..H, 1..W, [
+    let {
+      int: count = if N_GATES = 0 then 0
+                   else sum(g in 1..N_GATES where GATES[g].1 = r /\ GATES[g].2 = c)(1)
+                   endif;
+    } in
+      count > 0
+  | r in 1..H, c in 1..W
+  ]);
+
+int: DSWITCH_INDEX_UPPER = if N_DSWITCHES = 0 then 1 else N_DSWITCHES endif;
+array[1..H, 1..W] of 1..DSWITCH_INDEX_UPPER: dswitch_index_at =
+  array2d(1..H, 1..W, [
+    let {
+      int: ds_idx = if N_DSWITCHES = 0 then 0
+                    else sum(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c)(ds)
+                    endif;
+    } in
+      if ds_idx > 0 then ds_idx else 1 endif
+  | r in 1..H, c in 1..W
+  ]);
+
+array[1..H, 1..W] of bool: cell_has_dswitch =
+  array2d(1..H, 1..W, [
+    let {
+      int: count = if N_DSWITCHES = 0 then 0
+                   else sum(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c)(1)
+                   endif;
+    } in
+      count > 0
+  | r in 1..H, c in 1..W
+  ]);
+
+array[1..H, 1..W] of bool: cell_is_init =
+  array2d(1..H, 1..W, [
+    let {
+      int: count = if N_INIT_POS = 0 then 0
+                   else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(1)
+                   endif;
+    } in
+      count > 0
+  | r in 1..H, c in 1..W
+  ]);
+
 % --- Piece Category Sets ---
 set of Piece: STRAIGHTS = { STRAIGHT_TD, STRAIGHT_RL };
 set of Piece: CORNERS   = { CORNER_TR, CORNER_TL, CORNER_DR, CORNER_DL };
@@ -497,9 +555,9 @@ constraint forall(t in 1..N_TRAINS) (
     var Piece: p0 = grid[r0, c0];
     var Piece: p1 = grid[r1, c1];
     % Check if first move is blocked by a closed gate
-    var bool: blocked_by_gate = exists(g in 1..N_GATES) (
-      r1 = GATES[g].1 /\ c1 = GATES[g].2 /\ not gate_open[g, 1]
-    );
+    bool: dest_has_gate = cell_has_gate[r1, c1];
+    var bool: blocked_by_gate =
+      if dest_has_gate then not gate_open[gate_index_at[r1, c1], 1] else false endif;
   } in
     can_exit[p0, exit0] /\ 
     can_enter[p1, opposite[exit0]] /\
@@ -537,16 +595,32 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
     var 1..W: intended_c;
     var Dir: intended_entry_dir;
     % Check if intended position is blocked by a closed gate
-    var bool: blocked_by_gate = exists(g in 1..N_GATES) (
-      intended_r = GATES[g].1 /\ intended_c = GATES[g].2 /\ not gate_open[g, time+1]
-    );
+    var bool: blocked_by_gate =
+      if N_GATES = 0 then
+        false
+      else
+        if cell_has_gate[intended_r, intended_c] then
+          not gate_open[gate_index_at[intended_r, intended_c], time+1]
+        else
+          false
+        endif
+      endif;
     % Check if current piece is a DSWITCH and get its swap state
     var bool: is_dswitch = piece in DSWITCHES_SET;
-    var bool: dswitch_state = if is_dswitch then
-      exists(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c) (
-        dswitch_swapped[ds, time]
-      )
-    else false endif;
+    var bool: dswitch_state =
+      if N_DSWITCHES = 0 then
+        false
+      else
+        if is_dswitch then
+          if cell_has_dswitch[r, c] then
+            dswitch_swapped[dswitch_index_at[r, c], time]
+          else
+            false
+          endif
+        else
+          false
+        endif
+      endif;
   } in
   if r == TARGET.1 /\ c == TARGET.2 then
     % Stay at target
@@ -692,7 +766,7 @@ constraint
 constraint forall(r in 1..H, c in 1..W) (
   let { var Piece: p = grid[r, c]; } in
   if p in (CORNERS union SWITCHES union DSWITCHES_SET union STRAIGHTS) /\
-     not (exists(i in 1..N_INIT_POS) (r = INIT_POS[i].1 /\ c = INIT_POS[i].2) \/ 
+     not (cell_is_init[r, c] \/
           (p in STRAIGHTS /\ r = TARGET.1 /\ c = TARGET.2)) then
     forall(d in Dir where can_enter[p, d]) (
       let { int: rr = r + dr[d]; int: cc = c + dc[d]; } in
@@ -707,11 +781,7 @@ constraint forall(r in 1..H, c in 1..W) (
 constraint forall(r in 1..H, c in 1..W) (
   let { var Piece: p = grid[r, c] } in
   if p in TUNNELS then
-    % This cell must be one of the tunnel endpoints
-    exists(i in 1..N_TUNNELS) (
-      (r = TUNNEL_PAIRS[i].1 /\ c = TUNNEL_PAIRS[i].2) \/
-      (r = TUNNEL_PAIRS[i].4 /\ c = TUNNEL_PAIRS[i].5)
-    )
+    let { tuple(int, int): dest = tunnel_dest[r, c]; } in dest.1 > 0
   endif
 );
 
@@ -720,10 +790,7 @@ constraint forall(r in 1..H, c in 1..W) (
 constraint forall(r in 1..H, c in 1..W) (
   let { var Piece: p = grid[r, c] } in
   if p in DSWITCHES_SET then
-    % This cell must be one of the pre-defined DSWITCH locations
-    exists(ds in 1..N_DSWITCHES) (
-      r = DSWITCHES[ds].1 /\ c = DSWITCHES[ds].2
-    )
+    cell_has_dswitch[r, c]
   endif
 );
 
@@ -760,8 +827,14 @@ constraint forall(g in 1..N_GATES) (
 );
 
 % 18) Initial position safety: trains cannot start on closed gates
-constraint forall(t in 1..N_TRAINS, g in 1..N_GATES) (
-  (TRAINS[t].1 = GATES[g].1 /\ TRAINS[t].2 = GATES[g].2) -> GATES[g].4
+constraint forall(t in 1..N_TRAINS) (
+  if N_GATES = 0 then
+    true
+  elseif cell_has_gate[TRAINS[t].1, TRAINS[t].2] then
+    GATES[gate_index_at[TRAINS[t].1, TRAINS[t].2]].4
+  else
+    true
+  endif
 );
 
 % 19) Gate state transitions: toggle when activation is triggered
@@ -782,8 +855,16 @@ constraint forall(g in 1..N_GATES, time in 0..MAX_TIME-1) (
 );
 
 % 20) Gate blocking: trains cannot move into cells with closed gates
-constraint forall(t in 1..N_TRAINS, time in 0..MAX_TIME, g in 1..N_GATES) (
-  (train_row[t, time] = GATES[g].1 /\ train_col[t, time] = GATES[g].2) -> gate_open[g, time]
+constraint forall(t in 1..N_TRAINS, time in 0..MAX_TIME) (
+  if N_GATES = 0 then
+    true
+  else
+    let {
+      var bool: at_gate = cell_has_gate[train_row[t, time], train_col[t, time]];
+      var int: gate_idx = gate_index_at[train_row[t, time], train_col[t, time]];
+    } in
+      if at_gate then gate_open[gate_idx, time] else true endif
+  endif
 );
 
 % ========= DSWITCH CONSTRAINTS ==============================
