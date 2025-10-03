@@ -13,7 +13,7 @@ $outputDir = ".\results"
 # OR-Tools CP-SAT optimized for speed with 4 threads and 15 second timeout
 $parallelFlag = "--parallel"
 $parallelThreads = "8"
-$timeLimitMs = 600000  # Time limit in milliseconds
+$timeLimitMs = 1000  # Time limit in milliseconds
 
 # Create output directory if it doesn't exist
 if (-not (Test-Path $outputDir)) {
@@ -24,7 +24,7 @@ if (-not (Test-Path $outputDir)) {
 $testFiles = Get-ChildItem -Path $testDir -Filter "*.dzn" | Sort-Object Name
 
 # List of test files to ignore 3-10
-$ignoreTests = @("3-10C.dzn")
+$ignoreTests = @()
 
 # Filter out ignored tests
 $testFiles = $testFiles | Where-Object { $_.Name -notin $ignoreTests }
