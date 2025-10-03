@@ -15,7 +15,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, Any
 
 # Mapping from old board values to MiniZinc track types
 # Based on classes.ts Track enum and reverse-engineered from existing .dzn files
@@ -46,6 +46,7 @@ BOARD_TO_TRACK = {
     29: "STRAIGHT_RL",  # CAR_ENDING_TRACK_LEFT
     30: "STRAIGHT_TD",  # CAR_ENDING_TRACK_DOWN
     31: "STRAIGHT_TD",  # CAR_ENDING_TRACK_UP
+    34: "EMPTY",  # STATION_EMPTY - empty space adjacent to station\n    35: "EMPTY",  # ANOTHER_STATION_EMPTY - another empty space variant\n    36: "EMPTY",  # ANOTHER_STATION_EMPTY - another empty space variant\n    37: "EMPTY",  # ANOTHER_STATION_EMPTY - another empty space variant\n}
 }
 
 # Mapping from old mod values
@@ -56,6 +57,7 @@ MOD_CLOSED_GATE = 3
 MOD_OPEN_GATE = 4
 MOD_SWAPPING_TRACK = 5
 MOD_STARTING_CAR = 10
+MOD_STATION = 6
 
 # Direction mapping from string to MiniZinc enum
 DIRECTION_MAP = {
@@ -140,6 +142,9 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
             # Empty/roadblock positions (explicitly marked)
             elif board_val == 4:
                 init_pos.append((r + 1, c + 1, "EMPTY"))
+            # Station-adjacent empty spaces (handled separately in station collection)
+            elif board_val in [34, 35, 36, 37]:
+                continue  # Will be handled when processing stations
             # Pre-placed tracks
             elif board_val != 0 and board_val in BOARD_TO_TRACK:
                 track = BOARD_TO_TRACK[board_val]
@@ -205,6 +210,27 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
                 switch_num = mod_nums[r][c]
                 if switch_num > 0:  # Connected to a gate
                     activations.append((r + 1, c + 1, switch_num))
+
+    # Collect stations
+    stations = []
+    for r in range(H):
+        for c in range(W):
+            mod_val = mods[r][c]
+            if mod_val == MOD_STATION:
+                train_id = mod_nums[r][c]
+                # Convert 0-based train ID to 1-based for MiniZinc
+                # In original format: train 0 = first train, train 1 = second train, etc.
+                # In MiniZinc format: train 1 = first train, train 2 = second train, etc.
+                minizinc_train_id = train_id + 1
+                stations.append((r + 1, c + 1, minizinc_train_id))
+
+                # Check for adjacent empty spaces that should be added to init_pos
+                # Look in all 4 directions for board values 34, 35, 36, or 37 (STATION_EMPTY variants)
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < H and 0 <= nc < W:
+                        if board[nr][nc] in [34, 35, 36, 37]:  # STATION_EMPTY variants
+                            init_pos.append((nr + 1, nc + 1, "EMPTY"))
 
     # Generate the .dzn content
     lines = [
@@ -275,6 +301,15 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
     else:
         lines.append("DSWITCHES=[];")
 
+    lines.append(f"N_STATIONS={len(stations)};")
+    if stations:
+        lines.append("STATIONS=[")
+        for r, c, train_id in stations:
+            lines.append(f"  ({r},{c},{train_id}),")
+        lines.append("];")
+    else:
+        lines.append("STATIONS=[];")
+
     return "\n".join(lines) + "\n"
 
 
@@ -297,33 +332,33 @@ Examples:
     args = parser.parse_args()
 
     # Load levels.json
-    json_path = Path("/Users/tardis89/Desktop/me/RailboundSolver/levels.json")
-    output_dir = Path("/Users/tardis89/Desktop/me/railbound_cp/test")
+    json_path = Path(r"D:\Code\RailboundSolver\levels.json")
+    output_dir = Path("test")
 
     with open(json_path, "r") as f:
         levels = json.load(f)
 
-    # Filter to only worlds 1-4
-    def is_world_1_4(level_name: str) -> bool:
-        # Level names like "1-1", "2-3A", "3-10C", "4-5B"
-        # Skip levels starting with #, or worlds 5+
+    # Filter to only level 5
+    def is_world_5(level_name: str) -> bool:
+        # Level names like "5-1", "5-2", "5-3"
+        # Skip levels starting with #, or worlds other than 5
         if level_name.startswith("#"):
             return False
         world = level_name.split("-")[0]
         try:
-            return 1 <= int(world) <= 4
+            return int(world) == 5
         except ValueError:
             return False
 
     print(
-        f"{'Force converting' if args.force else 'Converting missing'} world 1-4 levels..."
+        f"{'Force converting' if args.force else 'Converting missing'} world 5 levels..."
     )
     converted = 0
     skipped = 0
     skipped_existing = 0
 
     for level_name, level_data in sorted(levels.items()):
-        if not is_world_1_4(level_name):
+        if not is_world_5(level_name):
             skipped += 1
             continue
 
@@ -343,8 +378,8 @@ Examples:
         except Exception as e:
             print(f"Error converting {level_name}: {e}", file=sys.stderr)
 
-    print(f"\nConversion complete!")
-    print(f"  Converted: {converted} levels from worlds 1-4")
+    print("\nConversion complete!")
+    print(f"  Converted: {converted} levels from world 5")
     if not args.force and skipped_existing > 0:
         print(f"  Skipped (already exist): {skipped_existing} levels")
     print(f"  Skipped (other worlds): {skipped} levels")

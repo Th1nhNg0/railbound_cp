@@ -50,6 +50,9 @@ int: N_ACTIVATIONS;  % Number of activations
 % --- Dynamic Switches ---
 int: N_DSWITCHES;    % Number of dynamic switches
 
+% --- Stations ---
+int: N_STATIONS;     % Number of stations
+
 % ============================================================
 % TUNNEL LOOKUP ARRAYS
 % ============================================================
@@ -111,6 +114,7 @@ type TunnelPair = tuple(int, int, Dir,        % (row_A, col_A, exit_dir_A,
 type Gate = tuple(int, int, int, bool);      % (row, col, gate_id, initially_open)
 type Activation = tuple(int, int, int);      % (row, col, gate_id)
 type DSwitch = tuple(int, int, int);         % (row, col, dswitch_id)
+type Station = tuple(int, int, int);         % (row, col, train_id)
 
 % --- Track Piece Types ---
 % Visual guide:
@@ -172,6 +176,7 @@ array[1..N_TUNNELS] of TunnelPair: TUNNEL_PAIRS; % Tunnel pair definitions
 array[1..N_GATES] of Gate: GATES;              % Gate definitions
 array[1..N_ACTIVATIONS] of Activation: ACTIVATIONS; % Activation cell definitions
 array[1..N_DSWITCHES] of DSwitch: DSWITCHES;   % Dynamic switch definitions
+array[1..N_STATIONS] of Station: STATIONS;     % Station definitions
 
 % ============================================================
 % HELPER CONSTANTS
@@ -223,6 +228,29 @@ array[1..H, 1..W] of bool: cell_has_dswitch =
     let {
       int: count = if N_DSWITCHES = 0 then 0
                    else sum(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c)(1)
+                   endif;
+    } in
+      count > 0
+  | r in 1..H, c in 1..W
+  ]);
+
+int: STATION_INDEX_UPPER = if N_STATIONS = 0 then 1 else N_STATIONS endif;
+array[1..H, 1..W] of 1..STATION_INDEX_UPPER: station_index_at =
+  array2d(1..H, 1..W, [
+    let {
+      int: st_idx = if N_STATIONS = 0 then 0
+                    else sum(st in 1..N_STATIONS where STATIONS[st].1 = r /\ STATIONS[st].2 = c)(st)
+                    endif;
+    } in
+      if st_idx > 0 then st_idx else 1 endif
+  | r in 1..H, c in 1..W
+  ]);
+
+array[1..H, 1..W] of bool: cell_has_station =
+  array2d(1..H, 1..W, [
+    let {
+      int: count = if N_STATIONS = 0 then 0
+                   else sum(st in 1..N_STATIONS where STATIONS[st].1 = r /\ STATIONS[st].2 = c)(1)
                    endif;
     } in
       count > 0
@@ -534,6 +562,12 @@ array[1..N_GATES, 0..MAX_TIME] of var bool: gate_open;
 % DSWITCH states over time: false = normal, true = swapped
 array[1..N_DSWITCHES, 0..MAX_TIME] of var bool: dswitch_swapped;
 
+% Station visit tracking: has each train visited its corresponding station?
+array[1..N_TRAINS, 1..N_STATIONS] of var bool: station_visited;
+
+% Station wait time: remaining wait time at station (0 = not waiting, 1-2 = waiting)
+array[1..N_TRAINS, 0..MAX_TIME] of var 0..2: station_wait_time;
+
 
 % ========= CONSTRAINTS ======================================
 
@@ -624,6 +658,9 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
   } in
   if r == TARGET.1 /\ c == TARGET.2 then
     % Stay at target
+    (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
+  elseif station_wait_time[t, time] > 0 then
+    % Waiting at station - stay in place
     (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
   else
     % Compute intended movement via piece routing
@@ -906,6 +943,100 @@ constraint forall(ds in 1..N_DSWITCHES, time in 0..MAX_TIME-1) (
 );
 
 
+% ========= STATION CONSTRAINTS ==============================
+
+% 25) Station validation: stations must be on non-EMPTY track pieces
+constraint forall(st in STATIONS) (
+  grid[st.1, st.2] != EMPTY
+);
+
+% 26) Station validation: stations only on STRAIGHT, CORNER, or SWITCH tracks
+constraint forall(st in STATIONS) (
+  grid[st.1, st.2] in (STRAIGHTS union CORNERS union SWITCHES)
+);
+
+% 27) Station ID validation: each station's train_id must be valid
+constraint forall(st in STATIONS) (
+  st.3 >= 1 /\ st.3 <= N_TRAINS
+);
+
+% 28) No coexistence: stations cannot share cells with gates, activations, or dswitches
+constraint forall(st in STATIONS, g in GATES) (
+  not (st.1 = g.1 /\ st.2 = g.2)
+);
+constraint forall(st in STATIONS, a in ACTIVATIONS) (
+  not (st.1 = a.1 /\ st.2 = a.2)
+);
+constraint forall(st in STATIONS, ds in DSWITCHES) (
+  not (st.1 = ds.1 /\ st.2 = ds.2)
+);
+
+% 29) Station visit requirement: each train must visit all its assigned stations before reaching the target.
+constraint forall(st in 1..N_STATIONS) (
+  let {
+    int: train_id = STATIONS[st].3;
+    int: station_r = STATIONS[st].1;
+    int: station_c = STATIONS[st].2;
+  } in
+    % The station must be visited by the correct train before that train arrives at the target.
+    station_visited[train_id, st] = exists(time in 0..MAX_TIME) (
+      train_row[train_id, time] = station_r /\
+      train_col[train_id, time] = station_c /\
+      time < arrival_time[train_id]
+    )
+);
+
+% 29b) Enforce station visit requirement: all required visits must happen.
+constraint forall(st in 1..N_STATIONS) (
+  station_visited[STATIONS[st].3, st]
+);
+
+% 30) Station wait mechanics: wait 2 steps the first time a train reaches each assigned station
+constraint forall(t in 1..N_TRAINS, time in 0..MAX_TIME) (
+  if N_STATIONS = 0 then
+    station_wait_time[t, time] = 0
+  else
+    let {
+      set of int: matching_stations = {st | st in 1..N_STATIONS where STATIONS[st].3 = t};
+    } in
+    if card(matching_stations) = 0 then
+      station_wait_time[t, time] = 0
+    else
+      let {
+        var bool: entering_first_station =
+          exists(st in matching_stations)(
+            let {
+              int: station_r = STATIONS[st].1;
+              int: station_c = STATIONS[st].2;
+              var bool: at_station_now =
+                train_row[t, time] = station_r /\ train_col[t, time] = station_c;
+              var bool: was_at_station_prev =
+                if time = 0 then false
+                else train_row[t, time-1] = station_r /\ train_col[t, time-1] = station_c
+                endif;
+              var bool: visited_before =
+                if time = 0 then false
+                else exists(prev in 0..time-1)(
+                  train_row[t, prev] = station_r /\ train_col[t, prev] = station_c
+                )
+                endif;
+            } in
+              at_station_now /\ not was_at_station_prev /\ not visited_before
+          );
+      } in
+      if entering_first_station then
+        station_wait_time[t, time] = 2
+      elseif time = 0 then
+        station_wait_time[t, time] = 0
+      elseif station_wait_time[t, time-1] > 0 then
+        station_wait_time[t, time] = station_wait_time[t, time-1] - 1
+      else
+        station_wait_time[t, time] = 0
+      endif
+    endif
+  endif
+);
+
 % ========= SOLVE & OUTPUT ===================================
 
 solve:: int_search([grid[r,c] | r in 1..H, c in 1..W],
@@ -928,6 +1059,7 @@ any: initial_data = (
     gates: [ (GATES[g].1, GATES[g].2, GATES[g].3, GATES[g].4) | g in 1..N_GATES ],
     activations: [ (ACTIVATIONS[a].1, ACTIVATIONS[a].2, ACTIVATIONS[a].3) | a in 1..N_ACTIVATIONS ],
     dswitches: [ (DSWITCHES[ds].1, DSWITCHES[ds].2, DSWITCHES[ds].3) | ds in 1..N_DSWITCHES ],
+    stations: [ (STATIONS[st].1, STATIONS[st].2, STATIONS[st].3) | st in 1..N_STATIONS ],
 );
 any: solution_data :: output_only = (
   grid:showJSON(grid)

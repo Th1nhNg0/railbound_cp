@@ -1,8 +1,17 @@
 {
     "openFiles": [
-        "railbound.mzn"
+        "railbound.mzn",
+        "test/5-7A.dzn",
+        "test/5-8.dzn",
+        "test/5-8A.dzn",
+        "test/5-5A.dzn",
+        "test/5-5B.dzn",
+        "test/5-6.dzn",
+        "test/5-6A.dzn",
+        "test/5-6B.dzn",
+        "test/5-7.dzn"
     ],
-    "openTab": 0,
+    "openTab": 4,
     "projectFiles": [
         "railbound.mzn",
         "test/1-1.dzn",
@@ -85,10 +94,29 @@
         "test/4-9.dzn",
         "test/4-9A.dzn",
         "test/4-9B.dzn",
+        "test/5-1.dzn",
+        "test/5-2.dzn",
+        "test/5-3.dzn",
+        "test/5-3A.dzn",
+        "test/5-3B.dzn",
+        "test/5-4.dzn",
+        "test/5-4A.dzn",
+        "test/5-4B.dzn",
+        "test/5-4C.dzn",
+        "test/5-5.dzn",
+        "test/5-5A.dzn",
+        "test/5-5B.dzn",
+        "test/5-6.dzn",
+        "test/5-6A.dzn",
+        "test/5-6B.dzn",
+        "test/5-7.dzn",
+        "test/5-7A.dzn",
+        "test/5-8.dzn",
+        "test/5-8A.dzn",
         "test/8-1.dzn",
         "test/8-2.dzn"
     ],
-    "selectedBuiltinConfigId": "cp-sat",
-    "selectedBuiltinConfigVersion": "9.12.4544",
+    "selectedBuiltinConfigId": "org.chuffed.chuffed",
+    "selectedBuiltinConfigVersion": "0.13.2",
     "version": 106
 }

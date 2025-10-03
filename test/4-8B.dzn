@@ -48,3 +48,5 @@ DSWITCHES=[
 (4,5,1),
 (4,6,2),
 ];
+N_STATIONS=0;
+STATIONS=[];

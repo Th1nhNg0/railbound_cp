@@ -13,7 +13,7 @@ $outputDir = ".\results"
 # OR-Tools CP-SAT optimized for speed with 4 threads and 15 second timeout
 $parallelFlag = "--parallel"
 $parallelThreads = "8"
-$timeLimitMs = 1000  # Time limit in milliseconds
+$timeLimitMs = 15000  # Time limit in milliseconds
 
 # Create output directory if it doesn't exist
 if (-not (Test-Path $outputDir)) {

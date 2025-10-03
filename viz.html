@@ -86,16 +86,34 @@
         width: 24px;
         height: 24px;
         border-radius: 50%;
-        border: 3px solid #9B63CB;
-        background-color: #F5E2FF;
+        border: 3px solid #9b63cb;
+        background-color: #f5e2ff;
         z-index: 15;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: bold;
         font-size: 12px;
-        color: #9B63CB;
+        color: #9b63cb;
         text-shadow: 0px 0px 1px white;
+      }
+      .station-indicator {
+        position: absolute;
+        bottom: 5px;
+        left: 5px;
+        width: 24px;
+        height: 24px;
+        background-color: #00aaff;
+        border: 2px solid #0066cc;
+        border-radius: 4px;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        color: white;
+        text-shadow: 1px 1px 2px black;
       }
     </style>
   </head>
@@ -119,6 +137,7 @@
           gates,
           activations,
           dswitches,
+          stations,
         } = userData;
 
         const container = document.getElementById("gridContainer");
@@ -408,6 +427,19 @@
                 dswitchDiv.textContent = dswitch_id;
                 dswitchDiv.title = `DSwitch ${dswitch_id} (toggles on activation)`;
                 cell.appendChild(dswitchDiv);
+              }
+
+              // Add station indicators
+              const station = stations?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              if (station) {
+                const [, , train_id] = station;
+                const stationDiv = document.createElement("div");
+                stationDiv.className = "station-indicator";
+                stationDiv.textContent = train_id;
+                stationDiv.title = `Station for Train ${train_id} (2-step wait)`;
+                cell.appendChild(stationDiv);
               }
 
               container.appendChild(cell);
