@@ -19,6 +19,7 @@
 include "lib/types.mzn";      % Custom types and enums (Piece, Dir, etc.)
 include "lib/globals.mzn";    % Global constants and helper lookups
 include "lib/routing.mzn";    % Piece routing tables and logic
+include "lib/precomputation.mzn"; % Pre-computation for domain reduction
 
 % --- Constraint Modules ---
 % Each file contains a thematic group of constraints.
@@ -89,6 +90,17 @@ array[1..N_GATES, 0..MAX_TIME] of var bool: gate_open;
 array[1..N_DSWITCHES, 0..MAX_TIME] of var bool: dswitch_swapped;
 array[1..N_TRAINS, 1..N_STATIONS] of var bool: station_visited;
 array[1..N_TRAINS, 0..MAX_TIME] of var 0..2: station_wait_time;
+
+% ============================================================
+% PRE-COMPUTATION CONSTRAINTS
+% ============================================================
+
+% Apply the pre-calculated valid domains to the grid variables.
+% This is the core of the optimization, significantly reducing the
+% search space before the solver even begins.
+constraint forall(r in 1..H, c in 1..W) (
+  grid[r, c] in valid_pieces[r, c]
+);
 
 % ============================================================
 % SOLVE
