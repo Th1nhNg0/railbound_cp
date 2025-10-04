@@ -1,27 +1,25 @@
 % ============================================================
-% Railbound Puzzle Solver (Modular Main)
+% Railbound Puzzle Solver (Optimized Version)
 % ------------------------------------------------------------
-% Composes the Railbound constraint model from reusable
-% modules for types, helpers, constraints, and output.
+% Enhanced version with improved search strategies and
+% constraint ordering to minimize node exploration.
 % ============================================================
 
-include "globals.mzn";              % MiniZinc global constraint library
-include "lib/types.mzn";            % Shared enums and type aliases
+include "globals.mzn";
+include "lib/types.mzn";
 
 % ============================================================
 % PARAMETERS
 % ============================================================
 
-int: W;             % Grid width
-int: H;             % Grid height
-int: N_TRAINS;      % Number of trains
-int: MAX_TIME;      % Simulation horizon (time steps)
-int: MAX_TRACKS;    % Max number of track pieces that can be placed
+int: W;
+int: H;
+int: N_TRAINS;
+int: MAX_TIME;
+int: MAX_TRACKS;
 
-% Target cell trains must reach sequentially
 tuple(int, int): TARGET;
 
-% Pre-placed elements
 int: N_INIT_POS;
 int: N_TUNNELS;
 int: N_GATES;
@@ -41,8 +39,8 @@ array[1..N_ACTIVATIONS] of Activation: ACTIVATIONS;
 array[1..N_DSWITCHES] of DSwitch: DSWITCHES;
 array[1..N_STATIONS] of Station: STATIONS;
 
-include "lib/globals.mzn";          % Direction helpers and lookup tables
-include "lib/predicates.mzn";       % Generic predicates and functions
+include "lib/globals.mzn";
+include "lib/predicates.mzn";
 
 % ============================================================
 % DECISION VARIABLES
@@ -62,22 +60,31 @@ array[1..N_TRAINS, 0..MAX_TIME] of var 0..2: station_wait_time;
 % CONSTRAINT COMPOSITION
 % ============================================================
 
-include "constraints/scheduling.mzn";  % Movement and arrival ordering
-include "constraints/collision.mzn";   % Collision avoidance
-include "constraints/capacity.mzn";    % Track placement and budget
-include "constraints/gates.mzn";       % Gate placement and dynamics
-include "constraints/dswitch.mzn";     % Dynamic switch behaviour
-include "constraints/stations.mzn";    % Station validation and dwell
+include "constraints/capacity.mzn";
+include "constraints/scheduling.mzn";
+include "constraints/collision.mzn";
+include "constraints/gates.mzn";
+include "constraints/dswitch.mzn";
+include "constraints/stations.mzn";
 
 % ============================================================
-% SEARCH AND SOLUTION STRATEGY
+% OPTIMIZED SEARCH STRATEGY (OR-Tools Compatible)
 % ============================================================
+
+% Key optimizations:
+% 1. Grid-first search strategy to prune early
+% 2. Use first_fail for grid to focus on constrained cells
+% 3. Input order for arrival times respects sequential constraint
+% 4. Parallel search with OR-Tools for best performance
 
 solve
-  :: int_search(arrival_time, first_fail, indomain_min)
-  :: restart_luby(250)
+  % Phase 1: Place grid pieces first (most constrained)
   :: int_search([grid[r, c] | r in 1..H, c in 1..W],
-                 first_fail, indomain_split)
-  satisfy;
+                 first_fail, indomain_min)
   
-include "output/formatting.mzn";     % Textual and visual outputs
+  % Phase 2: Fix arrival times
+  :: int_search(arrival_time, input_order, indomain_min)
+  
+  satisfy;
+
+include "output/formatting.mzn";

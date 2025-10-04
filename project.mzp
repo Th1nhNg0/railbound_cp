@@ -1,19 +1,9 @@
 {
     "openFiles": [
-        "main.mzn",
-        "data/5/5-7A.dzn",
-        "data/5/5-8.dzn",
-        "data/5/5-8A.dzn",
-        "data/5/5-5A.dzn",
-        "data/5/5-5B.dzn",
-        "data/5/5-6.dzn",
-        "data/5/5-6A.dzn",
-        "data/5/5-6B.dzn",
-        "data/5/5-7.dzn"
+        "main.mzn"
     ],
-    "openTab": 4,
+    "openTab": 0,
     "projectFiles": [
-        "main.mzn",
         "data/1/1-1.dzn",
         "data/1/1-10.dzn",
         "data/1/1-11.dzn",
@@ -114,9 +104,10 @@
         "data/5/5-8.dzn",
         "data/5/5-8A.dzn",
         "data/8/8-1.dzn",
-        "data/8/8-2.dzn"
+        "data/8/8-2.dzn",
+        "main.mzn"
     ],
-    "selectedBuiltinConfigId": "org.chuffed.chuffed",
-    "selectedBuiltinConfigVersion": "0.13.2",
+    "selectedBuiltinConfigId": "org.gecode.gecode",
+    "selectedBuiltinConfigVersion": "6.3.0",
     "version": 106
 }
