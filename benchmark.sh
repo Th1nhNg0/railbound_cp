@@ -36,7 +36,7 @@ if ! [[ "$level" =~ ^[1-9]$ ]]; then
 fi
 
 solver="chuffed"
-time_limit=15000
+time_limit=60000
 max_tests=0
 wall_time=""
 model_file="main.mzn"
