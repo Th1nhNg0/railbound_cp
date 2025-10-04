@@ -70,7 +70,7 @@ Write-Host "Summary    : $summaryFile"
     Write-Host "Command    : minizinc --solver $Solver --time-limit $TimeLimit --statistics <Model> <Data>" -ForegroundColor DarkCyan
 Write-Host "============================================================`n" -ForegroundColor Cyan
 
-$csvHeader = "timestamp,level,puzzle,status,duration_ms,solver,time_ms,failures,nodes,propagations,restarts,variables,intVars,boolVars,propagators,peakDepth,nSolutions,objective,objectiveBound,paths,flatBoolVars,flatIntVars,flatBoolConstraints,flatIntConstraints,evaluatedReifiedConstraints,evaluatedHalfReifiedConstraints,eliminatedImplications,method,flatTime"
+$csvHeader = "timestamp,level,puzzle,status,duration_ms,solver,solveTime,failures,propagations,nSolutions,objective,objectiveBound,paths,flatBoolVars,flatIntVars,flatBoolConstraints,flatIntConstraints,evaluatedReifiedConstraints,evaluatedHalfReifiedConstraints,eliminatedImplications,method,flatTime,boolVariables"
 $csvHeader | Out-File -FilePath $csvFile -Encoding UTF8
 
 # Track overall statistics
@@ -80,7 +80,6 @@ $unsatCount = 0
 $timeoutCount = 0
 $errorCount = 0
 $totalTime = 0
-$totalNodes = 0
 $totalFailures = 0
 
 # Process each level
@@ -148,16 +147,9 @@ foreach ($levelDir in $levelDirs) {
             return $default
         }
         
-        $time = Extract-Stat "%%%mzn-stat: time=([0-9.]+)" "N/A"
+        $solveTime = Extract-Stat "%%%mzn-stat: solveTime=([0-9.]+)" "N/A"
         $failures = Extract-Stat "%%%mzn-stat: failures=([0-9]+)" "0"
-        $nodes = Extract-Stat "%%%mzn-stat: nodes=([0-9]+)" "0"
         $propagations = Extract-Stat "%%%mzn-stat: propagations=([0-9]+)" "0"
-        $restarts = Extract-Stat "%%%mzn-stat: restarts=([0-9]+)" "0"
-        $variables = Extract-Stat "%%%mzn-stat: variables=([0-9]+)" "0"
-        $intVars = Extract-Stat "%%%mzn-stat: intVars=([0-9]+)" "0"
-        $boolVars = Extract-Stat "%%%mzn-stat: boolVariables=([0-9]+)" "0"
-        $propagators = Extract-Stat "%%%mzn-stat: propagators=([0-9]+)" "0"
-        $peakDepth = Extract-Stat "%%%mzn-stat: peakDepth=([0-9]+)" "0"
         $nSolutions = Extract-Stat "%%%mzn-stat: nSolutions=([0-9]+)" "0"
         $objective = Extract-Stat "%%%mzn-stat: objective=([0-9.-]+)" "N/A"
         $objectiveBound = Extract-Stat "%%%mzn-stat: objectiveBound=([0-9.-]+)" "N/A"
@@ -171,13 +163,11 @@ foreach ($levelDir in $levelDirs) {
         $eliminatedImplications = Extract-Stat "%%%mzn-stat: eliminatedImplications=([0-9]+)" "0"
         $method = Extract-Stat '%%%mzn-stat: method="([^"]+)"' "N/A"
         $flatTime = Extract-Stat "%%%mzn-stat: flatTime=([0-9.]+)" "N/A"
+        $boolVariables = Extract-Stat "%%%mzn-stat: boolVariables=([0-9]+)" "0"
         
         # Update totals
-        if ($time -ne "N/A") {
-            $totalTime += [double]$time
-        }
-        if ($nodes -ne "N/A" -and $nodes -ne "0") {
-            $totalNodes += [long]$nodes
+        if ($solveTime -ne "N/A") {
+            $totalTime += [double]$solveTime
         }
         if ($failures -ne "N/A" -and $failures -ne "0") {
             $totalFailures += [long]$failures
@@ -192,16 +182,9 @@ foreach ($levelDir in $levelDirs) {
             $status,
             [math]::Round($duration,0),
             $Solver,
-            $time,
+            $solveTime,
             $failures,
-            $nodes,
             $propagations,
-            $restarts,
-            $variables,
-            $intVars,
-            $boolVars,
-            $propagators,
-            $peakDepth,
             $nSolutions,
             $objective,
             $objectiveBound,
@@ -214,13 +197,14 @@ foreach ($levelDir in $levelDirs) {
             $evaluatedHalfReifiedConstraints,
             $eliminatedImplications,
             $method,
-            $flatTime
+            $flatTime,
+            $boolVariables
         )
         $csvLine = $csvValues -join ','
         $csvLine | Out-File -FilePath $csvFile -Append -Encoding UTF8
         
         # Display key stats
-        Write-Host " (${time}s, ${nodes} nodes, ${failures} fails)" -ForegroundColor Gray
+        Write-Host " (${solveTime}s, ${failures} fails)" -ForegroundColor Gray
     }
     
     Write-Host "`nLevel ${level}: $levelSuccess/$($puzzleFiles.Count) solved" -ForegroundColor Cyan
@@ -248,8 +232,6 @@ STATISTICS
 ------------------------------------------------------------
 Total Time     : $([math]::Round($totalTime, 2)) seconds
 Avg Time       : $(if ($successCount -gt 0) { [math]::Round($totalTime / $successCount, 3) } else { "N/A" }) seconds (successful puzzles)
-Total Nodes    : $totalNodes
-Avg Nodes      : $(if ($successCount -gt 0) { [math]::Round($totalNodes / $successCount, 0) } else { "N/A" }) (successful puzzles)
 Total Failures : $totalFailures
 Avg Failures   : $(if ($successCount -gt 0) { [math]::Round($totalFailures / $successCount, 0) } else { "N/A" }) (successful puzzles)
 
