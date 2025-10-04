@@ -67,19 +67,19 @@ This project models Railbound puzzles as Constraint Satisfaction Problems (CSP) 
 Run the solver on a puzzle:
 
 ```bash
-minizinc --solver Gecode railbound.mzn test/2-1.dzn
+minizinc --solver Gecode main.mzn data/2/2-1.dzn
 ```
 
 Or use Chuffed for more complex puzzles:
 
 ```bash
-minizinc --solver Chuffed railbound.mzn test/2-8.dzn
+minizinc --solver Chuffed main.mzn data/2/2-8.dzn
 ```
 
 With a time limit (in milliseconds):
 
 ```bash
-minizinc --solver Gecode railbound.mzn test/2-8.dzn --time-limit 60000
+minizinc --solver Gecode main.mzn data/2/2-8.dzn --time-limit 60000
 ```
 
 ### Output
@@ -251,7 +251,7 @@ When a train passes through cell (1,2), it triggers the activation, causing the 
 
 ## Example Puzzles
 
-The `test/` directory contains **82 puzzles** from worlds 1-4 and 8:
+The `data/` directory contains **82 puzzles** from worlds 1-4 and 8, grouped by world (e.g., `data/1/1-1.dzn`):
 
 ### World 1 Puzzles (21 puzzles)
 
@@ -305,7 +305,7 @@ The project includes a comprehensive test runner script that runs all puzzles an
 
 This script:
 
-- Runs all test files in the `test/` directory
+- Runs all data files in the `data/` directory
 - Uses the Chuffed solver by default
 - Collects detailed statistics (solve time, nodes, failures, variables, etc.)
 - Saves output to the `results/` directory
@@ -318,15 +318,15 @@ Test several puzzles at once:
 
 ```bash
 # PowerShell
-Get-ChildItem test\*.dzn | ForEach-Object {
+Get-ChildItem data -Filter *.dzn -Recurse | ForEach-Object {
   Write-Host "Solving $_..."
-  minizinc --solver Gecode railbound.mzn $_.FullName
+  minizinc --solver Gecode main.mzn $_.FullName
 }
 
 # Bash
-for f in test/*.dzn; do
+for f in data/*/*.dzn; do
   echo "Solving $f..."
-  minizinc --solver Gecode railbound.mzn "$f"
+  minizinc --solver Gecode main.mzn "$f"
 done
 ```
 
@@ -377,20 +377,35 @@ This ensures the solver finds the cleanest, most elegant solution rather than ar
 
 ```
 railbound_cp/
-├── railbound.mzn           # Main MiniZinc model (well-documented and refactored)
-├── viz.html                # Interactive visualization for puzzle solutions
-├── project.mzp             # MiniZinc IDE project file
+├── main.mzn                # Modular main MiniZinc model
+├── railbound.mzn           # Legacy entry point including main.mzn
+├── lib/
+│   ├── types.mzn           # Shared enums and type aliases
+│   ├── globals.mzn         # Lookup tables and routing helpers
+│   └── predicates.mzn      # Reusable predicates/functions
+├── constraints/
+│   ├── scheduling.mzn      # Movement and arrival ordering
+│   ├── collision.mzn       # Collision avoidance logic
+│   ├── capacity.mzn        # Track placement and capacity rules
+│   ├── gates.mzn           # Gate placement and toggling
+│   ├── dswitch.mzn         # Dynamic switch behaviour
+│   └── stations.mzn        # Station validation and dwell time
+├── output/
+│   └── formatting.mzn      # Textual and visual output formatting
+├── data/
+│   ├── 1/                  # World 1 puzzles (1-*.dzn)
+│   ├── 2/                  # World 2 puzzles (2-*.dzn)
+│   ├── 3/                  # World 3 puzzles (3-*.dzn)
+│   ├── 4/                  # World 4 puzzles (4-*.dzn)
+│   ├── 5/                  # World 5 puzzles (5-*.dzn)
+│   └── 8/                  # World 8 puzzles (8-*.dzn)
+├── results/                # Test output directory (gitignored)
+│   └── test_results.csv
 ├── run_all_tests.ps1       # PowerShell script to run all tests with statistics
+├── project.mzp             # MiniZinc IDE project file
 ├── cheatsheet.mzn          # Quick reference for MiniZinc syntax
 ├── cover.jpg               # Cover image
-├── test/                   # Example puzzle data files (28 puzzles)
-│   ├── 1-*.dzn            # World 1 puzzles (9 files)
-│   ├── 2-*.dzn            # World 2 puzzles (7 files)
-│   ├── 3-*.dzn            # World 3 puzzles (10 files)
-│   ├── 8-*.dzn            # World 8 puzzles (2 files)
-│   └── ...
-├── results/                # Test output directory (gitignored)
-│   └── test_results.csv   # Summary of test runs
+├── viz.html                # Interactive visualization for puzzle solutions
 └── README.md               # This file
 ```
 
@@ -398,11 +413,11 @@ railbound_cp/
 
 - **README.md**: Main documentation (this file)
 - **viz.html**: Interactive visualization that displays gates (colored circles) and activations (orange squares)
-- **railbound.mzn**: Extensively commented model with inline documentation
+- **main.mzn**: Extensively commented model with inline documentation
 
 ## Code Quality
 
-The `railbound.mzn` model features:
+The `main.mzn` model features:
 
 - ✅ Clean, well-organized structure with clear section headers
 - ✅ Comprehensive inline documentation
@@ -417,9 +432,9 @@ Feel free to add more puzzle definitions or improve the model!
 
 ### Adding New Puzzles
 
-1. Create a new `.dzn` file in the `test/` directory
+1. Create a new `.dzn` file inside the appropriate `data/<world>/` directory
 2. Define the grid size, trains, and constraints (see `Puzzle Format` section above)
-3. Test with: `minizinc --solver Gecode railbound.mzn test/your-puzzle.dzn`
+3. Test with: `minizinc --solver Gecode main.mzn data/<world>/your-puzzle.dzn`
 
 ### Improving the Model
 

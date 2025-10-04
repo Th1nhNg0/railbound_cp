@@ -6,8 +6,8 @@ param(
 )
 
 # Configuration
-$modelFile = ".\railbound.mzn"
-$testDir = ".\test"
+$modelFile = ".\main.mzn"
+$testDir = ".\data"
 $solvers = @("chuffed")
 $outputDir = ".\results"
 # OR-Tools CP-SAT optimized for speed with 4 threads and 15 second timeout
@@ -20,8 +20,8 @@ if (-not (Test-Path $outputDir)) {
     New-Item -ItemType Directory -Path $outputDir | Out-Null
 }
 
-# Get all .dzn files in the test directory
-$testFiles = Get-ChildItem -Path $testDir -Filter "*.dzn" | Sort-Object Name
+# Get all .dzn files in the data directory (recursively)
+$testFiles = Get-ChildItem -Path $testDir -Filter "*.dzn" -Recurse | Sort-Object DirectoryName, Name
 
 # List of test files to ignore 3-10
 $ignoreTests = @()

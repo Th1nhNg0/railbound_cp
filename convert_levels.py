@@ -8,7 +8,7 @@ Usage:
 
 Options:
   --force    Force convert all levels, overwriting existing files
-             (default: only convert levels that don't exist in test/)
+             (default: only convert levels that don't exist in data/)
 """
 
 import argparse
