@@ -73,10 +73,11 @@ include "constraints/stations.mzn";    % Station validation and dwell
 % SEARCH AND SOLUTION STRATEGY
 % ============================================================
 
-solve:: int_search([grid[r, c] | r in 1..H, c in 1..W],
-                    first_fail, indomain_min, complete)
-     :: int_search([arrival_time[t] | t in 1..N_TRAINS],
-                    first_fail, indomain_min, complete)
-satisfy;
-
+solve
+  :: int_search(arrival_time, first_fail, indomain_min)
+  :: restart_luby(250)
+  :: int_search([grid[r, c] | r in 1..H, c in 1..W],
+                 first_fail, indomain_split)
+  satisfy;
+  
 include "output/formatting.mzn";     % Textual and visual outputs
