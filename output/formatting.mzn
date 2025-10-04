@@ -25,7 +25,7 @@ any: solution_data :: output_only = (
   grid: showJSON(grid)
 );
 
-output :: vis_server("viz.html", initial_data) solution_data;
+% output :: vis_server("viz.html", initial_data) solution_data;
 
 output [
   "============================================================\n",

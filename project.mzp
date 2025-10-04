@@ -1,8 +1,9 @@
 {
     "openFiles": [
-        "main.mzn"
+        "main.mzn",
+        "data/5/5-5B.dzn"
     ],
-    "openTab": 0,
+    "openTab": 1,
     "projectFiles": [
         "data/1/1-1.dzn",
         "data/1/1-10.dzn",
@@ -105,9 +106,10 @@
         "data/5/5-8A.dzn",
         "data/8/8-1.dzn",
         "data/8/8-2.dzn",
-        "main.mzn"
+        "main.mzn",
+        "output/formatting.mzn"
     ],
-    "selectedBuiltinConfigId": "org.gecode.gecode",
-    "selectedBuiltinConfigVersion": "6.3.0",
+    "selectedBuiltinConfigId": "cp-sat",
+    "selectedBuiltinConfigVersion": "9.14.6206",
     "version": 106
 }

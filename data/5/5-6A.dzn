@@ -1,7 +1,7 @@
 W=8;
 H=7;
 
-MAX_TIME=W*H;
+MAX_TIME=30;
 MAX_TRACKS=14;
 
 TARGET=(3,8);
