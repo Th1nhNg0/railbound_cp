@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MiniZinc Visualisation</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      .grid-container {
+        display: inline-grid;
+        gap: 0;
+        border: 2px solid black;
+      }
+      .grid-cell {
+        width: 80px;
+        height: 80px;
+        border: 1px solid black;
+        position: relative;
+        box-sizing: border-box;
+      }
+      .grid-cell img {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform-origin: center center;
+      }
+      .bg-normal {
+        background-color: #f0f0f0;
+      }
+      .bg-target {
+        background-color: #90ee90;
+      }
+      .bg-init {
+        background-color: #d0d0d0;
+      }
+      .bg-tunnel {
+        background-color: #c0c0c0;
+      }
+      .gate-indicator {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 3px solid #000;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        color: white;
+        text-shadow: 1px 1px 2px black;
+      }
+      .gate-open {
+        background-color: #00ff00;
+      }
+      .gate-closed {
+        background-color: #ff0000;
+      }
+      .activation-indicator {
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        width: 24px;
+        height: 24px;
+        background-color: #ffaa00;
+        border: 2px solid #000;
+        border-radius: 4px;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        color: white;
+        text-shadow: 1px 1px 2px black;
+      }
+      .dswitch-indicator {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 3px solid #9b63cb;
+        background-color: #f5e2ff;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        color: #9b63cb;
+        text-shadow: 0px 0px 1px white;
+      }
+      .station-indicator {
+        position: absolute;
+        bottom: 5px;
+        left: 5px;
+        width: 24px;
+        height: 24px;
+        background-color: #00aaff;
+        border: 2px solid #0066cc;
+        border-radius: 4px;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        color: white;
+        text-shadow: 1px 1px 2px black;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="flex items-center justify-center min-h-screen">
+      <div id="gridContainer"></div>
+    </main>
+    <script src="/minizinc-ide.js"></script>
+    <script>
+      (async function () {
+        // getUserData can be used to retrieve the JSON data passed to vis_server()
+        const userData = await MiniZincIDE.getUserData();
+        console.log({ userData });
+        const {
+          grid_height,
+          grid_width,
+          init_positions,
+          trains,
+          target,
+          tunnels,
+          gates,
+          activations,
+          dswitches,
+          stations,
+        } = userData;
+
+        const container = document.getElementById("gridContainer");
+
+        // Generate different colors for each tunnel pair
+        function getTunnelColor(tunnelIndex) {
+          const colors = [
+            "#00FF00", // Green (original)
+            "#FF00FF", // Magenta
+            "#00FFFF", // Cyan
+            "#FFFF00", // Yellow
+            "#FF8800", // Orange
+            "#8800FF", // Purple
+            "#FF0088", // Pink
+            "#00FF88", // Teal
+          ];
+          return colors[tunnelIndex % colors.length];
+        }
+
+        // Load and cache tunnel SVG with color replacement
+        let tunnelSvgTemplate = null;
+        const tunnelSvgPromise = fetch("images/Tunnel.svg")
+          .then((response) => response.text())
+          .then((svgText) => {
+            tunnelSvgTemplate = svgText;
+            return svgText;
+          });
+
+        // Helper to get rotation angle from direction
+        // Direction: TOP=1, RIGHT=2, DOWN=3, LEFT=4 (or string names)
+        // Tunnels default to LEFT (0°), Cars default to RIGHT (0°)
+        function getRotation(direction, isCarImage = false) {
+          // Convert string direction to number if needed
+          const dirValue = direction?.e;
+          let dirNum = dirValue;
+
+          if (typeof dirValue === "string") {
+            const dirMap = { TOP: 1, RIGHT: 2, DOWN: 3, LEFT: 4 };
+            dirNum = dirMap[dirValue];
+          }
+
+          if (isCarImage) {
+            // Car images default to RIGHT
+            const carRotationMap = {
+              1: -90, // TOP: rotate -90° (or 270°)
+              2: 0, // RIGHT: no rotation (default)
+              3: 90, // DOWN: rotate 90°
+              4: 180, // LEFT: rotate 180°
+            };
+            return carRotationMap[dirNum] || 0;
+          } else {
+            // Tunnel images default to LEFT
+            const tunnelRotationMap = {
+              1: 90, // TOP: rotate 90°
+              2: 180, // RIGHT: rotate 180°
+              3: 270, // DOWN: rotate 270°
+              4: 0, // LEFT: no rotation (default)
+            };
+            return tunnelRotationMap[dirNum] || 0;
+          }
+        }
+
+        // Draw grid
+        function drawGrid(gridData = null) {
+          container.innerHTML = "";
+          container.style.gridTemplateColumns = `repeat(${grid_width}, 80px)`;
+          container.style.gridTemplateRows = `repeat(${grid_height}, 80px)`;
+          container.className = "grid-container";
+
+          for (let row = 0; row < grid_height; row++) {
+            for (let col = 0; col < grid_width; col++) {
+              const cell = document.createElement("div");
+              cell.className = "grid-cell";
+
+              // Check cell type for background color
+              const isTarget =
+                target && target[0] === row + 1 && target[1] === col + 1;
+              const isInitPos = init_positions?.some(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              const isTunnel = tunnels?.some(
+                ([r_A, c_A, , r_B, c_B]) =>
+                  (r_A === row + 1 && c_A === col + 1) ||
+                  (r_B === row + 1 && c_B === col + 1)
+              );
+
+              if (isTarget) {
+                cell.classList.add("bg-target");
+              } else if (isTunnel) {
+                cell.classList.add("bg-tunnel");
+              } else if (isInitPos) {
+                cell.classList.add("bg-init");
+              } else {
+                cell.classList.add("bg-normal");
+              }
+
+              // Check if this cell has an init position piece
+              const initPos = init_positions?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+
+              // Check if this cell has a tunnel and get its index
+              let tunnelIndex = -1;
+              const tunnel = tunnels?.find((t, idx) => {
+                const [r_A, c_A, , r_B, c_B] = t;
+                if (
+                  (r_A === row + 1 && c_A === col + 1) ||
+                  (r_B === row + 1 && c_B === col + 1)
+                ) {
+                  tunnelIndex = idx;
+                  return true;
+                }
+                return false;
+              });
+
+              // Add track piece if solution is provided
+              if (gridData) {
+                const piece = gridData[row][col];
+
+                // Don't draw solution piece if this is an init position or tunnel
+                // (keep the original piece visible)
+                if (initPos) {
+                  const [, , track] = initPos;
+                  if (track.e === "EMPTY") {
+                    const img = document.createElement("img");
+                    img.src = "images/4 Fence.svg";
+                    img.alt = "Fence";
+                    cell.appendChild(img);
+                  } else {
+                    const img = document.createElement("img");
+                    img.src = `images/${track.e}.svg`;
+                    img.alt = track.e;
+                    cell.appendChild(img);
+                  }
+                } else if (tunnel) {
+                  const [r_A, c_A, dir_A, r_B, c_B, dir_B] = tunnel;
+                  const isTunnelA = r_A === row + 1 && c_A === col + 1;
+                  const dir = isTunnelA ? dir_A : dir_B;
+                  const color = getTunnelColor(tunnelIndex);
+
+                  if (tunnelSvgTemplate) {
+                    const coloredSvg = tunnelSvgTemplate.replace(
+                      /#00FF00/g,
+                      color
+                    );
+                    const svgBlob = new Blob([coloredSvg], {
+                      type: "image/svg+xml",
+                    });
+                    const url = URL.createObjectURL(svgBlob);
+
+                    const img = document.createElement("img");
+                    img.src = url;
+                    img.alt = "Tunnel";
+                    img.style.transform = `rotate(${getRotation(
+                      dir,
+                      false
+                    )}deg)`;
+                    cell.appendChild(img);
+                  } else {
+                    // Fallback if SVG not loaded yet
+                    const img = document.createElement("img");
+                    img.src = "images/Tunnel.svg";
+                    img.alt = "Tunnel";
+                    img.style.transform = `rotate(${getRotation(
+                      dir,
+                      false
+                    )}deg)`;
+                    cell.appendChild(img);
+                  }
+                } else if (piece.e !== "EMPTY") {
+                  // Only draw solution piece if not init or tunnel
+                  const img = document.createElement("img");
+                  img.src = `images/${piece.e}.svg`;
+                  img.alt = piece.e;
+                  cell.appendChild(img);
+                }
+              } else {
+                // Draw initial state
+                if (initPos) {
+                  const [, , track] = initPos;
+                  if (track.e === "EMPTY") {
+                    const img = document.createElement("img");
+                    img.src = "images/4 Fence.svg";
+                    img.alt = "Fence";
+                    cell.appendChild(img);
+                  } else {
+                    const img = document.createElement("img");
+                    img.src = `images/${track.e}.svg`;
+                    img.alt = track.e;
+                    cell.appendChild(img);
+                  }
+                }
+
+                if (tunnel) {
+                  const [r_A, c_A, dir_A, r_B, c_B, dir_B] = tunnel;
+                  const isTunnelA = r_A === row + 1 && c_A === col + 1;
+                  const dir = isTunnelA ? dir_A : dir_B;
+                  const color = getTunnelColor(tunnelIndex);
+
+                  if (tunnelSvgTemplate) {
+                    const coloredSvg = tunnelSvgTemplate.replace(
+                      /#00FF00/g,
+                      color
+                    );
+                    const svgBlob = new Blob([coloredSvg], {
+                      type: "image/svg+xml",
+                    });
+                    const url = URL.createObjectURL(svgBlob);
+
+                    const img = document.createElement("img");
+                    img.src = url;
+                    img.alt = "Tunnel";
+                    img.style.transform = `rotate(${getRotation(
+                      dir,
+                      false
+                    )}deg)`;
+                    cell.appendChild(img);
+                  } else {
+                    // Fallback if SVG not loaded yet
+                    const img = document.createElement("img");
+                    img.src = "images/Tunnel.svg";
+                    img.alt = "Tunnel";
+                    img.style.transform = `rotate(${getRotation(
+                      dir,
+                      false
+                    )}deg)`;
+                    cell.appendChild(img);
+                  }
+                }
+              }
+
+              // Add trains
+              const train = trains?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              if (train) {
+                const [, , direction] = train;
+                const trainIndex = trains.indexOf(train);
+                const rotation = getRotation(direction, true);
+
+                const img = document.createElement("img");
+                img.src = `images/Car ${trainIndex + 1}.svg`;
+                img.alt = `Car ${trainIndex + 1}`;
+                img.style.transform = `rotate(${rotation}deg)`;
+                img.style.zIndex = "10";
+                cell.appendChild(img);
+              }
+
+              // Add gates
+              const gate = gates?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              if (gate) {
+                const [, , gate_id, initially_open] = gate;
+                const gateDiv = document.createElement("div");
+                gateDiv.className = `gate-indicator ${
+                  initially_open ? "gate-open" : "gate-closed"
+                }`;
+                gateDiv.textContent = gate_id;
+                gateDiv.title = `Gate ${gate_id}: ${
+                  initially_open ? "Open" : "Closed"
+                }`;
+                cell.appendChild(gateDiv);
+              }
+
+              // Add activations
+              const activation = activations?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              if (activation) {
+                const [, , gate_id] = activation;
+                const activationDiv = document.createElement("div");
+                activationDiv.className = "activation-indicator";
+                activationDiv.textContent = gate_id;
+                activationDiv.title = `Activation for Gate/DSwitch ${gate_id}`;
+                cell.appendChild(activationDiv);
+              }
+
+              // Add dswitch indicators
+              const dswitch = dswitches?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              if (dswitch) {
+                const [, , dswitch_id] = dswitch;
+                const dswitchDiv = document.createElement("div");
+                dswitchDiv.className = "dswitch-indicator";
+                dswitchDiv.textContent = dswitch_id;
+                dswitchDiv.title = `DSwitch ${dswitch_id} (toggles on activation)`;
+                cell.appendChild(dswitchDiv);
+              }
+
+              // Add station indicators
+              const station = stations?.find(
+                ([r, c]) => r === row + 1 && c === col + 1
+              );
+              if (station) {
+                const [, , train_id] = station;
+                const stationDiv = document.createElement("div");
+                stationDiv.className = "station-indicator";
+                stationDiv.textContent = train_id;
+                stationDiv.title = `Station for Train ${train_id} (2-step wait)`;
+                cell.appendChild(stationDiv);
+              }
+
+              container.appendChild(cell);
+            }
+          }
+        }
+
+        // Wait for tunnel SVG to load before drawing initial grid
+        await tunnelSvgPromise;
+        drawGrid();
+
+        function setSolution(data) {
+          const grid = JSON.parse(data.grid);
+          drawGrid(grid);
+          const trains = JSON.parse(data.trains);
+        }
+
+        // Visualise last solution on startup
+        const numSols = await MiniZincIDE.getNumSolutions();
+        if (numSols > 0) {
+          const solution = await MiniZincIDE.getSolution(numSols - 1);
+          setSolution(solution.data);
+        }
+
+        // Show new solutions if we're following the latest solution
+        let followLatest = true;
+        MiniZincIDE.on("solution", (solution) => {
+          if (followLatest) {
+            setSolution(solution.data);
+          }
+        });
+
+        MiniZincIDE.on("goToSolution", async (index) => {
+          followLatest = index === -1;
+          const solution = await MiniZincIDE.getSolution(index);
+          setSolution(solution.data);
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -212,7 +212,7 @@ for level_dir in "${LEVEL_DIRS_ARRAY[@]}"; do
         
         # Update running totals for the final summary.
         if [ "$solve_time" != "N/A" ]; then
-            total_time=$(echo "$total_time + $solve_time" | bc -l)
+            total_time=$(awk "BEGIN {print $total_time + $solve_time}")
         fi
         if [ "$failures" != "N/A" ] && [ "$failures" -gt 0 ]; then
             total_failures=$((total_failures + failures))
@@ -231,13 +231,13 @@ done
 # --- Generate Summary ---
 # Calculate averages and percentages for the summary report.
 if [ $success_count -gt 0 ]; then
-    avg_time=$(echo "scale=3; $total_time / $success_count" | bc -l)
+    avg_time=$(awk "BEGIN {printf \"%.3f\", $total_time / $success_count}")
     avg_failures=$((total_failures / success_count))
 else
     avg_time="N/A"
     avg_failures="N/A"
 fi
-success_percent=$(echo "scale=1; 100.0 * $success_count / $total_puzzles" | bc -l)
+success_percent=$(awk "BEGIN {printf \"%.1f\", 100.0 * $success_count / $total_puzzles}")
 
 # Create the summary text block.
 summary_text="============================================================

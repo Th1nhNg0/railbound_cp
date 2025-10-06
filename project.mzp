@@ -1,0 +1,33 @@
+{
+    "openFiles": [
+        "main.mzn"
+    ],
+    "openTab": 0,
+    "projectFiles": [
+        "data/1/1-1.dzn",
+        "data/1/1-10.dzn",
+        "data/1/1-11.dzn",
+        "data/1/1-11A.dzn",
+        "data/1/1-11B.dzn",
+        "data/1/1-12.dzn",
+        "data/1/1-12A.dzn",
+        "data/1/1-13.dzn",
+        "data/1/1-13A.dzn",
+        "data/1/1-14.dzn",
+        "data/1/1-14A.dzn",
+        "data/1/1-15.dzn",
+        "data/1/1-15A.dzn",
+        "data/1/1-2.dzn",
+        "data/1/1-3.dzn",
+        "data/1/1-4.dzn",
+        "data/1/1-5.dzn",
+        "data/1/1-6.dzn",
+        "data/1/1-7.dzn",
+        "data/1/1-8.dzn",
+        "data/1/1-9.dzn",
+        "main.mzn",
+        "solver.mpc"
+    ],
+    "selectedSolverConfigFile": "solver.mpc",
+    "version": 106
+}
