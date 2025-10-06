@@ -1,0 +1,24 @@
+W=5;
+H=3;
+
+MAX_TIME=W*H;
+MAX_TRACKS=3;
+
+TARGET=(2,5);
+
+TRAINS=[(2,1,RIGHT)];
+
+INIT_POS=[
+(2,1,STRAIGHT_RL),
+(2,4,STRAIGHT_RL),
+(2,5,STRAIGHT_RL),
+];
+TUNNEL_PAIRS=[];
+
+GATES=[];
+ACTIVATIONS=[];
+
+DSWITCHES=[];
+STATIONS=[];
+
+% the decoy should be in 2,4,left

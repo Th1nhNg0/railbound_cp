@@ -1,0 +1,36 @@
+W=8;
+H=6;
+
+MAX_TIME=W*H;
+MAX_TRACKS=13;
+
+TARGET=(4,8);
+
+TRAINS=[(4,1,RIGHT),(2,1,RIGHT)];
+
+INIT_POS=[
+(2,1,STRAIGHT_RL),
+(2,4,CORNER_TL),
+(3,5,STRAIGHT_RL),
+(4,1,STRAIGHT_RL),
+(4,6,ESWITCH_D_T_R),
+(4,7,STRAIGHT_RL),
+(4,8,STRAIGHT_RL),
+(5,4,STRAIGHT_RL),
+(2,5,EMPTY),
+(6,4,EMPTY),
+];
+TUNNEL_PAIRS=[];
+
+GATES=[
+(4,7,1,false),
+];
+ACTIVATIONS=[
+(2,4,1),
+];
+
+DSWITCHES=[];
+STATIONS=[
+  (3,5,1),
+  (5,4,2),
+];

@@ -1,0 +1,47 @@
+W=9;
+H=9;
+
+MAX_TIME=27;
+MAX_TRACKS=18;
+
+TARGET=(2,9);
+
+TRAINS=[(9,3,TOP),(9,5,TOP)];
+
+INIT_POS=[
+(2,3,CORNER_DL),
+(2,5,CORNER_TR),
+(2,6,STRAIGHT_RL),
+(2,7,STRAIGHT_RL),
+(2,8,STRAIGHT_RL),
+(2,9,STRAIGHT_RL),
+(3,4,EMPTY),
+(4,4,EMPTY),
+(5,3,CORNER_TL),
+(5,5,STRAIGHT_RL),
+(5,8,DSWITCH_L_R_D),
+(6,5,EMPTY),
+(8,8,DSWITCH_R_L_T),
+(9,3,STRAIGHT_TD),
+(9,5,STRAIGHT_TD),
+];
+TUNNEL_PAIRS=[
+  (5, 1, RIGHT, 8, 1, RIGHT),
+  (1, 5, DOWN, 5, 9, LEFT),
+  (2, 1, RIGHT, 8, 9, LEFT),
+];
+
+GATES=[
+(2,7,2,false),
+];
+ACTIVATIONS=[
+(2,3,2),
+(5,3,1),
+(5,5,1),
+];
+
+DSWITCHES=[
+(5,8,1),
+(8,8,1),
+];
+STATIONS=[];

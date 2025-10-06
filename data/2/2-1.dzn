@@ -1,0 +1,24 @@
+W=7;
+H=4;
+
+MAX_TIME=6;
+MAX_TRACKS=6;
+
+TARGET=(1,7);
+
+TRAINS=[(4,1,RIGHT)];
+
+INIT_POS=[
+(1,7,STRAIGHT_RL),
+(4,1,STRAIGHT_RL),
+];
+TUNNEL_PAIRS=[
+  (1, 4, RIGHT, 4, 4, LEFT),
+];
+
+GATES=[];
+ACTIVATIONS=[];
+
+DSWITCHES=[];
+
+STATIONS=[];

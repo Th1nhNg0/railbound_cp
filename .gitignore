@@ -1,0 +1,6 @@
+results/
+__pycache__/
+benchmark_results/
+*.csv
+*.txt
+.DS_Store
