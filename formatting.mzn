@@ -23,8 +23,8 @@ output [
   "============================================================\n\n",
   "GRID LAYOUT:\n",
   show2d(grid), "\n\n",
-  "Latest arrival time: \(max(arrival_time))\n",
-  "Tracks was used: \(sum(r in 1..H, c in 1..W)(
+  "TIME_USED: \(max(arrival_time))\n",
+  "TRACK_USED: \(sum(r in 1..H, c in 1..W)(
   bool2int(grid[r, c] != EMPTY /\
        not exists(i in 1..N_INIT_POS)(
          INIT_POS[i].1 = r /\ INIT_POS[i].2 = c
