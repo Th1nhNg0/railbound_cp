@@ -53,16 +53,17 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
           not gate_open[gate_index_at[intended_r, intended_c], time+1]
         else false endif
       endif;
-    % var bool: is_dswitch = piece in DSWITCHES_SET;
+    var bool: is_dswitch = piece in DSWITCHES_SET;
     % var bool: is_eswitch = piece in ESWITCHES_SET;
-    % var bool: dswitch_state =
-    %   if N_DSWITCHES > 0 /\ is_dswitch /\ cell_has_dswitch[r, c] then
-    %     dswitch_swapped[dswitch_index_at[r, c], time]
-    %   else false endif;
+    var bool: dswitch_state =
+      if N_DSWITCHES > 0 /\ is_dswitch /\ cell_has_dswitch[r, c] then
+        dswitch_toggled[dswitch_index_at[r, c], time]
+      else false endif;
     % var bool: eswitch_state =
     %   if N_ESWITCHES > 0 /\ is_eswitch /\ cell_has_eswitch[r, c] then
     %     eswitch_swapped[eswitch_index_at[r, c], time]
     %   else false endif;
+    var Piece: effective_piece = if is_dswitch then dswitch_effective_piece(piece, dswitch_state) else piece endif;
   } in
   % If the train is already at the target or waiting at a station, it does not move.
   if r == TARGET.1 /\ c == TARGET.2 then
@@ -72,11 +73,8 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
   else
     % Determine the exit direction based on the piece type (standard, dswitch, or eswitch).
     can_enter[piece, entry_dir] /\
-    % (if is_dswitch then exit_dir = dswitch_exit(piece, entry_dir, dswitch_state)
-    %  elseif is_eswitch then exit_dir = eswitch_exit(piece, entry_dir, eswitch_state)
-    %  else 
-    exit_dir = exit_of[piece, entry_dir] /\
-    %  endif) /\
+    % Use the effective piece (toggled or not) to determine exit direction for DSWITCHES
+    exit_dir = exit_of[effective_piece, entry_dir] /\
     % Determine the intended next cell based on the exit direction or tunnel destination.
     (if piece in TUNNELS_SET then
        let {

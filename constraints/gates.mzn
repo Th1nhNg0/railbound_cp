@@ -44,11 +44,13 @@ constraint forall(t in 1..MAX_TIME, g in 1..N_GATES)(
 
 % --- Gate Passage Constraint ---
 % Prevents trains from entering a cell with a closed gate.
-constraint forall(t in 1..N_TRAINS, i in 1..arrival_time[t])(
-    if cell_has_gate[train_row[t, i], train_col[t, i]] then
-        % If the cell has a gate, the gate must be open for the train to be there.
-        gate_open[gate_index_at[train_row[t, i], train_col[t, i]], i]
-    else
-        true
-    endif
-);
+constraint if N_GATES > 0 then
+    forall(t in 1..N_TRAINS, i in 1..arrival_time[t])(
+        if cell_has_gate[train_row[t, i], train_col[t, i]] then
+            % If the cell has a gate, the gate must be open for the train to be there.
+            gate_open[gate_index_at[train_row[t, i], train_col[t, i]], i]
+        else
+            true
+        endif
+    )
+else true endif;

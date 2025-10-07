@@ -230,3 +230,47 @@ array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
   DOWN,  DOWN,  DOWN,  DOWN,  % TUNNEL_D
   LEFT,  LEFT,  LEFT,  LEFT   % TUNNEL_L
 ]);
+
+% --- Dynamic Switch Toggle Mapping ---
+% Maps a DSWITCH piece to its toggled counterpart.
+array[Piece] of Piece: dswitch_toggle = [
+  EMPTY,         % EMPTY
+  STRAIGHT_TD,   % STRAIGHT_TD
+  STRAIGHT_RL,   % STRAIGHT_RL
+  CORNER_TR,     % CORNER_TR
+  CORNER_TL,     % CORNER_TL
+  CORNER_DR,     % CORNER_DR
+  CORNER_DL,     % CORNER_DL
+  SWITCH_T_D_R,  % SWITCH_T_D_R
+  SWITCH_T_D_L,  % SWITCH_T_D_L
+  SWITCH_D_T_R,  % SWITCH_D_T_R
+  SWITCH_D_T_L,  % SWITCH_D_T_L
+  SWITCH_R_L_T,  % SWITCH_R_L_T
+  SWITCH_R_L_D,  % SWITCH_R_L_D
+  SWITCH_L_R_T,  % SWITCH_L_R_T
+  SWITCH_L_R_D,  % SWITCH_L_R_D
+  DSWITCH_D_T_R, % DSWITCH_T_D_R -> DSWITCH_D_T_R
+  DSWITCH_D_T_L, % DSWITCH_T_D_L -> DSWITCH_D_T_L
+  DSWITCH_T_D_R, % DSWITCH_D_T_R -> DSWITCH_T_D_R
+  DSWITCH_T_D_L, % DSWITCH_D_T_L -> DSWITCH_T_D_L
+  DSWITCH_L_R_T, % DSWITCH_R_L_T -> DSWITCH_L_R_T
+  DSWITCH_L_R_D, % DSWITCH_R_L_D -> DSWITCH_L_R_D
+  DSWITCH_R_L_T, % DSWITCH_L_R_T -> DSWITCH_R_L_T
+  DSWITCH_R_L_D, % DSWITCH_L_R_D -> DSWITCH_R_L_D
+  ESWITCH_T_D_R, % ESWITCH_T_D_R
+  ESWITCH_T_D_L, % ESWITCH_T_D_L
+  ESWITCH_D_T_R, % ESWITCH_D_T_R
+  ESWITCH_D_T_L, % ESWITCH_D_T_L
+  ESWITCH_R_L_T, % ESWITCH_R_L_T
+  ESWITCH_R_L_D, % ESWITCH_R_L_D
+  ESWITCH_L_R_T, % ESWITCH_L_R_T
+  ESWITCH_L_R_D, % ESWITCH_L_R_D
+  TUNNEL_T,      % TUNNEL_T
+  TUNNEL_R,      % TUNNEL_R
+  TUNNEL_D,      % TUNNEL_D
+  TUNNEL_L       % TUNNEL_L
+];
+
+% Function to get the effective piece type for a DSWITCH based on its toggle state.
+function var Piece: dswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
+  if toggled then dswitch_toggle[base_piece] else base_piece endif;

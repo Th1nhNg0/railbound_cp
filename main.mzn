@@ -38,6 +38,11 @@ array[1..N_TRAINS, 1..MAX_TIME] of var Dir: train_dir;
 array[1..N_TRAINS] of var 0..MAX_TIME: arrival_time;
 % The state (true=open, false=closed) of each gate `g` at each timestep `i`.
 array[0..N_GATES, 0..MAX_TIME] of var bool: gate_open;
+% The state of each dynamic switch at each timestep.
+% A DSWITCH has two possible states representing its toggled configuration.
+% For example, DSWITCH_T_D_R can toggle to DSWITCH_D_T_R.
+% We track this as a boolean: false=original orientation, true=toggled orientation.
+array[1..max(1, N_DSWITCHES), 0..MAX_TIME] of var bool: dswitch_toggled;
 
 % ============================================================
 % CONSTRAINTS
@@ -46,6 +51,7 @@ array[0..N_GATES, 0..MAX_TIME] of var bool: gate_open;
 include "constraints/grid.mzn";
 include "constraints/trains.mzn";
 include "constraints/gates.mzn";
+include "constraints/dswitches.mzn";
 
 
 solve minimize sum(r in 1..H, c in 1..W)(
