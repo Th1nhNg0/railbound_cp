@@ -104,9 +104,11 @@ array[1..H, 1..W] of bool: cell_has_station =
 % --- Pre-placed Piece Lookup ---
 
 % A boolean grid indicating if a cell contains a pre-placed, unmovable piece.
-array[1..H, 1..W] of bool: cell_is_init =
-  array2d(1..H, 1..W, [ let { int: count = if N_INIT_POS = 0 then 0 else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
-
+  array[1..H, 1..W] of bool: cell_is_init =
+    array2d(1..H, 1..W, [ let { 
+      int: init_count = if N_INIT_POS = 0 then 0 else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(1) endif;
+      int: tunnel_count = if N_TUNNELS = 0 then 0 else sum(i in 1..N_TUNNELS where (TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c) \/ (TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c))(1) endif;
+    } in init_count > 0 \/ tunnel_count > 0 | r in 1..H, c in 1..W ]);
 % --- Routing Permission Tables ---
 
 % can_enter[p, d] is true if a train can enter a piece `p` from direction `d`.

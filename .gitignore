@@ -4,3 +4,4 @@ benchmark_results/
 *.csv
 *.txt
 .DS_Store
+renders/

@@ -2,7 +2,7 @@ W=5;
 H=7;
 
 MAX_TIME=15;
-MAX_TRACKS=15;
+MAX_TRACKS=12;
 
 TARGET=(1,5);
 

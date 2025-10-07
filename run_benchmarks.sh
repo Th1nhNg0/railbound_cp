@@ -32,7 +32,7 @@ TIME_LIMIT=300000       # Time limit per puzzle in milliseconds (5 minutes).
 LEVELS=""               # Comma-separated list of level directories to run (e.g., "1,2,8"). Default is all.
 OUTPUT_DIR="benchmark_results" # Directory to store output files.
 MODEL_FILE="main.mzn"   # The main MiniZinc model file.
-PARALLEL=8              # Number of parallel threads for the solver.
+PARALLEL=4              # Number of parallel threads for the solver.
 
 # --- Colors for Output ---
 RED='\033[0;31m'

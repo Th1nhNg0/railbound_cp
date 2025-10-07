@@ -23,13 +23,20 @@ output [
   "============================================================\n\n",
   "GRID LAYOUT:\n",
   show2d(grid), "\n\n",
-  "Latest arrival time: \(max(arrival_time))\n"
+  "Latest arrival time: \(max(arrival_time))\n",
+  "Tracks was used: \(sum(r in 1..H, c in 1..W)(
+  bool2int(grid[r, c] != EMPTY /\
+       not exists(i in 1..N_INIT_POS)(
+         INIT_POS[i].1 = r /\ INIT_POS[i].2 = c
+       )
+        /\ not (grid[r, c] in TUNNELS_SET)
+       )))"
 ]
 ++
 ["\nTRAIN PATHS:\n"]
 ++
 [
   "Train \(t): arrival at time \(arrival_time[t])\n" ++
-  "  Path: " ++ show([ (train_row[t, time], train_col[t, time], opposite[train_dir[t, time]]) | time in 1..fix(arrival_time[t]) ]) ++ "\n"
+  "  Path: " ++ show([ (train_row[t, time], train_col[t, time]) | time in 1..fix(arrival_time[t]) ]) ++ "\n"
   | t in 1..N_TRAINS
 ];
