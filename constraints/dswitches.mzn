@@ -17,13 +17,13 @@ constraint if N_DSWITCHES > 0 then
 else true endif;
 
 % --- DSWITCH State Propagation ---
-% Manages how DSWITCH states change over time based on trains passing through.
+% Manages how dynamic switch states change over time based on activation cells.
 constraint if N_DSWITCHES > 0 then
     forall(t in 1..MAX_TIME, ds in 1..N_DSWITCHES)(
             let {
-                % Count the NUMBER of trains that just entered activation cells linked to this dswitch at the PREVIOUS timestep.
-                % Each train that enters an activation cell causes one toggle.
-                % If the count is odd, the dswitch toggles; if even, it stays the same.
+                % Count the number of trains that newly entered activation cells linked to this dswitch in the previous timestep.
+                % Each newly entered activation triggers one toggle.
+                % Odd number of triggers: dswitch toggles state; even number: dswitch remains unchanged.
             var int: num_activations = if t = 0 then 0 else sum(a in 1..N_ACTIVATIONS, tr in 1..N_TRAINS)(
                 bool2int(
                     ACTIVATIONS[a].3 = DSWITCHES[ds].3 /\ % Check if activation `a` is linked to dswitch `ds` by ID.
@@ -40,11 +40,10 @@ constraint if N_DSWITCHES > 0 then
                     endif)
                 )
             ) endif;
-            % An odd number of activations toggles the state; an even number keeps it the same.
+            % Toggle occurs if an odd number of activations happened.
             var bool: should_toggle = (num_activations mod 2) = 1;
         } in
-        % The DSWITCH's state at time `t` is the inverse of its state at `t-1` if an odd number of activations occurred,
-        % otherwise it remains unchanged.
+        % Dynamic switch state at time t is toggled from t-1 if should_toggle is true, otherwise unchanged.
         dswitch_toggled[ds, t] = if should_toggle then not dswitch_toggled[ds, t - 1] else dswitch_toggled[ds, t - 1] endif
     )
 else true endif;

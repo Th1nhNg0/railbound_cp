@@ -14,9 +14,9 @@
 
 % --- Directional Helpers ---
 
-% dr: change in row index for each direction [TOP, RIGHT, DOWN, LEFT].
+% dr: row offset for each direction [TOP, RIGHT, DOWN, LEFT].
 array[Dir] of int: dr = [ -1,  0,  1,  0 ];
-% dc: change in column index for each direction [TOP, RIGHT, DOWN, LEFT].
+% dc: column offset for each direction [TOP, RIGHT, DOWN, LEFT].
 array[Dir] of int: dc = [  0,  1,  0, -1 ];
 % opposite: lookup table for the opposing direction.
 array[Dir] of Dir: opposite = [ DOWN, LEFT, TOP, RIGHT ];
@@ -57,7 +57,7 @@ array[1..H, 1..W] of int: tunnel_exit_dir =
 
 % Upper bound for the gate index, ensuring it's at least 1.
 int: GATE_INDEX_UPPER = if N_GATES = 0 then 1 else N_GATES endif;
-% Maps each cell (r,c) to the index of the gate at that location. Defaults to 1 if no gate.
+% Maps each cell (r,c) to the index of the gate at that location. Returns 1 for cells without gates.
 array[1..H, 1..W] of 1..GATE_INDEX_UPPER: gate_index_at =
   array2d(1..H, 1..W, [ let { int: g_idx = if N_GATES = 0 then 0 else sum(g in 1..N_GATES where GATES[g].1 = r /\ GATES[g].2 = c)(g) endif; } in if g_idx > 0 then g_idx else 1 endif | r in 1..H, c in 1..W ]);
 % A boolean grid indicating if a cell contains a gate.
@@ -68,7 +68,7 @@ array[1..H, 1..W] of bool: cell_has_gate =
 
 % Upper bound for the dynamic switch index, ensuring it's at least 1.
 int: DSWITCH_INDEX_UPPER = if N_DSWITCHES = 0 then 1 else N_DSWITCHES endif;
-% Maps each cell (r,c) to the index of the dynamic switch at that location. Defaults to 1.
+% Maps each cell (r,c) to the index of the dynamic switch at that location. Returns 1 for cells without dynamic switches.
 array[1..H, 1..W] of 1..DSWITCH_INDEX_UPPER: dswitch_index_at =
   array2d(1..H, 1..W, [ let { int: ds_idx = if N_DSWITCHES = 0 then 0 else sum(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c)(ds) endif; } in if ds_idx > 0 then ds_idx else 1 endif | r in 1..H, c in 1..W ]);
 % A boolean grid indicating if a cell contains a dynamic switch.
@@ -77,13 +77,13 @@ array[1..H, 1..W] of bool: cell_has_dswitch =
 
 % --- Exit-triggered Switch Metadata ---
 
-% The total number of exit-triggered switches, derived from INIT_POS.
-% An array of coordinates for all exit-triggered switches.
+% Array of coordinates for all exit-triggered switches, derived from INIT_POS.
+% Contains dummy value (0,0) if no exit-triggered switches exist.
 array[1..max(1, N_ESWITCHES)] of tuple(int, int): ESWITCHES_DERIVED =
   if N_ESWITCHES = 0 then [(0, 0)] else [(INIT_POS[i].1, INIT_POS[i].2) | i in 1..N_INIT_POS where INIT_POS[i].3 in ESWITCHES_SET] endif;
-% Upper bound for the exit-triggered switch index.
+% Upper bound for the exit-triggered switch index, ensuring it's at least 1.
 int: ESWITCH_INDEX_UPPER = if N_ESWITCHES = 0 then 1 else N_ESWITCHES endif;
-% Maps each cell (r,c) to the index of the exit-triggered switch at that location.
+% Maps each cell (r,c) to the index of the exit-triggered switch at that location. Returns 1 for cells without exit-triggered switches.
 array[1..H, 1..W] of 1..ESWITCH_INDEX_UPPER: eswitch_index_at =
   array2d(1..H, 1..W, [ let { int: es_idx = if N_ESWITCHES = 0 then 0 else sum(es in 1..N_ESWITCHES where ESWITCHES_DERIVED[es].1 = r /\ ESWITCHES_DERIVED[es].2 = c)(es) endif; } in if es_idx > 0 then es_idx else 1 endif | r in 1..H, c in 1..W ]);
 % A boolean grid indicating if a cell contains an exit-triggered switch.
@@ -92,9 +92,9 @@ array[1..H, 1..W] of bool: cell_has_eswitch =
 
 % --- Station Metadata ---
 
-% Upper bound for the station index.
+% Upper bound for the station index, ensuring it's at least 1.
 int: STATION_INDEX_UPPER = if N_STATIONS = 0 then 1 else N_STATIONS endif;
-% Maps each cell (r,c) to the index of the station at that location.
+% Maps each cell (r,c) to the index of the station at that location. Returns 1 for cells without stations.
 array[1..H, 1..W] of 1..STATION_INDEX_UPPER: station_index_at =
   array2d(1..H, 1..W, [ let { int: st_idx = if N_STATIONS = 0 then 0 else sum(st in 1..N_STATIONS where STATIONS[st].1 = r /\ STATIONS[st].2 = c)(st) endif; } in if st_idx > 0 then st_idx else 1 endif | r in 1..H, c in 1..W ]);
 % A boolean grid indicating if a cell contains a station.
@@ -103,7 +103,7 @@ array[1..H, 1..W] of bool: cell_has_station =
 
 % --- Pre-placed Piece Lookup ---
 
-% A boolean grid indicating if a cell contains a pre-placed, unmovable piece.
+% A boolean grid indicating if a cell contains a pre-placed, unmovable piece (from INIT_POS or tunnels).
   array[1..H, 1..W] of bool: cell_is_init =
     array2d(1..H, 1..W, [ let { 
       int: init_count = if N_INIT_POS = 0 then 0 else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(1) endif;

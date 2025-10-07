@@ -65,15 +65,15 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
     %   else false endif;
     var Piece: effective_piece = if is_dswitch then dswitch_effective_piece(piece, dswitch_state) else piece endif;
   } in
-  % If the train is already at the target or waiting at a station, it does not move.
+  % If the train has reached the target, it remains stationary.
   if r == TARGET.1 /\ c == TARGET.2 then
     (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
   % elseif station_wait_time[t, time] > 0 then
   %   (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
   else
-    % Determine the exit direction based on the piece type (standard, dswitch, or eswitch).
+    % Verify that the train can enter the current piece from its entry direction.
     can_enter[piece, entry_dir] /\
-    % Use the effective piece (toggled or not) to determine exit direction for DSWITCHES
+    % Determine exit direction using the effective piece (which accounts for dswitch toggle state).
     exit_dir = exit_of[effective_piece, entry_dir] /\
     % Determine the intended next cell based on the exit direction or tunnel destination.
     (if piece in TUNNELS_SET then
@@ -102,7 +102,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
 );
 
 % --- Train Arrival Constraint ---
-% A train has arrived if and only if its position is the target.
+% A train is considered arrived when it reaches the target and remains there for all subsequent timesteps.
 constraint forall(t in 1..N_TRAINS, time in 0..MAX_TIME) (
     (train_row[t, time] = TARGET.1 /\ train_col[t, time] = TARGET.2)
     <-> (time >= arrival_time[t])
@@ -115,7 +115,7 @@ constraint forall(t in 1..N_TRAINS-1) (
 );
 
 % --- No Collision Constraint ---
-% Ensures that no two trains are in the same cell at the same time.
+% Ensures that no two trains occupy the same cell at the same time (before either arrives).
 constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS)(
     forall(i in 1..max(arrival_time[t1], arrival_time[t2]))(
         if i <= arrival_time[t1] /\ i <= arrival_time[t2] then
@@ -127,7 +127,8 @@ constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS)(
     )
 );
 
-% Prevent trains from swapping positions in consecutive time steps
+% --- No Position Swap Constraint ---
+% Prevents trains from swapping positions in consecutive time steps (including through tunnels).
 constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS)(
     forall(i in 1..MAX_TIME-1)(
         if i < arrival_time[t1] /\ i < arrival_time[t2] then
@@ -145,7 +146,7 @@ constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS)(
                 var Piece: p1_i = grid[r1_i, c1_i];
                 var Piece: p2_i = grid[r2_i, c2_i];
 
-                % Get the effective start position for the time step i->i+1
+                % Get the effective position after tunnel teleportation for the time step i->i+1
                 var 1..H: eff_r1_i = if p1_i in TUNNELS_SET then tunnel_dest[r1_i, c1_i].1 else r1_i endif;
                 var 1..W: eff_c1_i = if p1_i in TUNNELS_SET then tunnel_dest[r1_i, c1_i].2 else c1_i endif;
                 var 1..H: eff_r2_i = if p2_i in TUNNELS_SET then tunnel_dest[r2_i, c2_i].1 else r2_i endif;

@@ -16,12 +16,12 @@ constraint forall(g in 1..N_GATES)(
 );
 
 % --- Gate State Propagation ---
-% Manages how gate states change over time based on activations.
+% Manages how gate states change over time based on activation cells.
 constraint forall(t in 1..MAX_TIME, g in 1..N_GATES)(
     let {
-        % Count the NUMBER of trains that just entered activation cells linked to this gate at the PREVIOUS timestep.
-        % Each train that enters an activation cell causes one toggle.
-        % If the count is odd, the gate toggles; if even, it stays the same.
+        % Count the number of trains that newly entered activation cells linked to this gate in the previous timestep.
+        % Each newly entered activation triggers one toggle.
+        % Odd number of triggers: gate toggles state; even number: gate remains unchanged.
         var int: num_activations = if t = 0 then 0 else sum(a in 1..N_ACTIVATIONS, tr in 1..N_TRAINS)(
             bool2int(
                 ACTIVATIONS[a].3 = GATES[g].3 /\ % Check if activation `a` is linked to gate `g` by gate ID.
@@ -38,11 +38,10 @@ constraint forall(t in 1..MAX_TIME, g in 1..N_GATES)(
                 endif)
             )
         ) endif;
-        % An odd number of activations toggles the state; an even number keeps it the same.
+        % Toggle occurs if an odd number of activations happened.
         var bool: should_toggle = (num_activations mod 2) = 1;
     } in
-    % The gate's state at time `t` is the inverse of its state at `t-1` if an odd number of activations occurred,
-    % otherwise it remains unchanged.
+    % Gate state at time t is toggled from t-1 if should_toggle is true, otherwise unchanged.
     gate_open[g, t] = if should_toggle then not gate_open[g, t - 1] else gate_open[g, t - 1] endif
 );
 
