@@ -6,14 +6,14 @@
 # This script automates the process of running the MiniZinc solver against a
 # collection of Railbound puzzle files (`.dzn`). It captures performance
 # statistics, determines the outcome (e.g., SUCCESS, TIMEOUT), and generates
-# both a detailed CSV report and a summary text file.
+# a detailed CSV report.
 #
 # Key Features:
 # - Run benchmarks on all or a specified subset of level directories.
 # - Customizable solver, time limit, and parallel threads.
 # - Parses MiniZinc's statistics output to extract key metrics.
 # - Color-coded console output for easy readability.
-# - Generates timestamped CSV and summary files for historical tracking.
+# - Generates timestamped CSV files for historical tracking.
 #
 # Usage:
 #   ./run_benchmarks.sh [options]
@@ -80,7 +80,6 @@ mkdir -p "$OUTPUT_DIR"
 # Generate timestamped filenames for the output reports.
 timestamp=$(date +%Y%m%d_%H%M%S)
 csvfile="$OUTPUT_DIR/benchmark_${SOLVER}_${timestamp}.csv"
-summaryfile="$OUTPUT_DIR/summary_${SOLVER}_${timestamp}.txt"
 
 # Set the data directory where puzzle files are located.
 data_dir="data"
@@ -117,7 +116,6 @@ echo "Solver     : $SOLVER"
 echo "Time Limit : $TIME_LIMIT ms"
 echo "Levels     : $(echo "${LEVEL_DIRS_ARRAY[@]}" | sed 's|data/||g; s|/||g' | tr '\n' ',' | sed 's/,$//')"
 echo "Output CSV : $csvfile"
-echo "Summary    : $summaryfile"
 echo "Command    : minizinc --solver $SOLVER --time-limit $TIME_LIMIT --statistics ${PARALLEL:+ -p $PARALLEL} $MODEL_FILE <Data>${GRAY}"
 echo -e "${CYAN}============================================================${NC}\n"
 
@@ -260,10 +258,8 @@ Avg Failures   : $avg_failures (for successful puzzles)
 ============================================================
 "
 
-# Write the summary to a file and print it to the console.
-echo "$summary_text" > "$summaryfile"
+# Print the summary to the console.
 echo -e "\n${CYAN}$summary_text${NC}"
 
 echo -e "\n${GREEN}Benchmark complete! Results saved to:${NC}"
 echo "  CSV:     $csvfile"
-echo "  Summary: $summaryfile"
