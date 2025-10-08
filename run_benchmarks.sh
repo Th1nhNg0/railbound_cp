@@ -123,7 +123,7 @@ echo -e "${CYAN}============================================================${NC
 
 # --- Initialize CSV and Statistics ---
 # Write the header row to the CSV file.
-csv_header="timestamp,level,puzzle,status,duration_ms,solver,solveTime,failures,propagations,nSolutions,objective,objectiveBound,paths,flatBoolVars,flatIntVars,flatBoolConstraints,flatIntConstraints,evaluatedReifiedConstraints,evaluatedHalfReifiedConstraints,eliminatedImplications,method,flatTime,boolVariables"
+csv_header="timestamp,level,puzzle,status,solver,solveTime,failures,propagations,flatBoolVars,flatIntVars,flatBoolConstraints,flatIntConstraints,flatTime,boolVariables"
 echo "$csv_header" > "$csvfile"
 
 # Initialize counters for the final summary.
@@ -198,15 +198,10 @@ for level_dir in "${LEVEL_DIRS_ARRAY[@]}"; do
         solve_time=$(extract_stat "%%%mzn-stat: solveTime=" "$output")
         failures=$(extract_stat "%%%mzn-stat: failures=" "$output" "0")
         propagations=$(extract_stat "%%%mzn-stat: propagations=" "$output" "0")
-        nSolutions=$(extract_stat "%%%mzn-stat: nSolutions=" "$output" "0")
-        objective=$(extract_stat "%%%mzn-stat: objective=" "$output")
-        objectiveBound=$(extract_stat "%%%mzn-stat: objectiveBound=" "$output")
-        paths=$(extract_stat "%%%mzn-stat: paths=" "$output" "0")
         flatBoolVars=$(extract_stat "%%%mzn-stat: flatBoolVars=" "$output" "0")
         flatIntVars=$(extract_stat "%%%mzn-stat: flatIntVars=" "$output" "0")
         flatBoolConstraints=$(extract_stat "%%%mzn-stat: flatBoolConstraints=" "$output" "0")
         flatIntConstraints=$(extract_stat "%%%mzn-stat: flatIntConstraints=" "$output" "0")
-        method=$(extract_stat '%%%mzn-stat: method="' "$output" | sed 's/"$//' || echo "N/A")
         flatTime=$(extract_stat "%%%mzn-stat: flatTime=" "$output")
         boolVariables=$(extract_stat "%%%mzn-stat: boolVariables=" "$output" "0")
         
@@ -220,7 +215,7 @@ for level_dir in "${LEVEL_DIRS_ARRAY[@]}"; do
         
         # Append the results for this puzzle to the CSV file.
         row_ts=$(date +%Y-%m-%dT%H:%M:%S)
-        csv_line="$row_ts,$level,$puzzle_name,$status,$duration,$SOLVER,$solve_time,$failures,$propagations,$nSolutions,$objective,$objectiveBound,$paths,$flatBoolVars,$flatIntVars,$flatBoolConstraints,$flatIntConstraints,N/A,N/A,N/A,$method,$flatTime,$boolVariables"
+        csv_line="$row_ts,$level,$puzzle_name,$status,$SOLVER,$solve_time,$failures,$propagations,$flatBoolVars,$flatIntVars,$flatBoolConstraints,$flatIntConstraints,$flatTime,$boolVariables"
         echo "$csv_line" >> "$csvfile"
         
         # Display the result for this puzzle in the console.

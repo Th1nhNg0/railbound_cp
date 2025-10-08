@@ -114,17 +114,17 @@ constraint forall(t in 1..N_TRAINS-1) (
   arrival_time[t] < arrival_time[t+1]
 );
 
+% --- Solver Hints for Better Performance ---
+% Add implicit constraint to guide search towards earlier arrivals
+constraint forall(t in 1..N_TRAINS-1)(
+    arrival_time[t] + 1 <= arrival_time[t+1]
+);
+
 % --- No Collision Constraint ---
 % Ensures that no two trains occupy the same cell at the same time (before either arrives).
-constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS)(
-    forall(i in 1..max(arrival_time[t1], arrival_time[t2]))(
-        if i <= arrival_time[t1] /\ i <= arrival_time[t2] then
-            % If both trains are active, their positions must not be the same.
-            (train_row[t1, i], train_col[t1, i]) != (train_row[t2, i], train_col[t2, i])
-        else
-            true
-        endif
-    )
+constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME)(
+    (i <= arrival_time[t1] /\ i <= arrival_time[t2]) ->
+    (train_row[t1, i] != train_row[t2, i] \/ train_col[t1, i] != train_col[t2, i])
 );
 
 % --- No Position Swap Constraint ---

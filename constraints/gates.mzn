@@ -11,13 +11,16 @@
 
 % --- Gate Initial State ---
 % Sets the initial state (open/closed) for each gate at time 0.
-constraint forall(g in 1..N_GATES)(
-    gate_open[g, 0] = GATES[g].4
-);
+constraint if N_GATES > 0 then
+    forall(g in 1..N_GATES)(gate_open[g, 0] = GATES[g].4)
+else
+    gate_open[0, 0] = true
+endif;
 
 % --- Gate State Propagation ---
 % Manages how gate states change over time based on activation cells.
-constraint forall(t in 1..MAX_TIME, g in 1..N_GATES)(
+constraint if N_GATES > 0 then
+    forall(t in 1..MAX_TIME, g in 1..N_GATES)(
     let {
         % Count the number of trains that newly entered activation cells linked to this gate in the previous timestep.
         % Each newly entered activation triggers one toggle.
@@ -43,7 +46,8 @@ constraint forall(t in 1..MAX_TIME, g in 1..N_GATES)(
     } in
     % Gate state at time t is toggled from t-1 if should_toggle is true, otherwise unchanged.
     gate_open[g, t] = if should_toggle then not gate_open[g, t - 1] else gate_open[g, t - 1] endif
-);
+    )
+else true endif;
 
 % --- Gate Passage Constraint ---
 % Prevents trains from entering a cell with a closed gate.
