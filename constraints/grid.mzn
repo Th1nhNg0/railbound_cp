@@ -35,7 +35,7 @@ constraint forall(i in 1..N_TUNNELS)(
 % --- Special Piece Init Constraint ---
 % Ensures that switches and tunnels must be pre-placed (cannot be placed dynamically).
 constraint forall(r in 1..H, c in 1..W)(
-    (grid[r, c] in DSWITCHES_SET \/ grid[r, c] in ESWITCHES_SET \/ grid[r, c] in TUNNELS_SET)-> cell_is_init[r, c]
+    (grid[r, c] in UNPLACEABLE_PIECES)-> cell_is_init[r, c]
 );
 
 % --- Train Path Validity Constraint ---
@@ -63,9 +63,8 @@ constraint forall(r in 1..H, c in 1..W)(
       int: nc = c + dc[d];
     } in
     bool2int(
-      in_bounds(nr, nc) /\ grid[nr, nc] != EMPTY /\
-      (can_enter[grid[nr, nc], opposite[d]] \/ can_exit[grid[nr, nc], opposite[d]]) /\
-      (can_enter[grid[r, c], d] \/ can_exit[grid[r, c], d])
+      in_bounds(nr, nc) /\
+      can_connect[grid[nr, nc], opposite[d]] /\can_connect[grid[r, c], d]
     )
   ) = 3
 );

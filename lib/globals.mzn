@@ -193,6 +193,11 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
   false, false, false, false   % ROCK
 ]);
 
+% can_connect[p, d] is true if a train can connect to piece `p` from direction `d`.
+% This combines can_enter and can_exit: a piece can be connected from direction d
+% if it can either enter from d or exit towards d.
+array[Piece, Dir] of bool: can_connect = array2d(Piece, Dir, [can_enter[p, d] \/ can_exit[p, d] | p in Piece, d in Dir]);
+
 % exit_of[p, d] determines the exit direction when entering piece `p` from direction `d`.
 array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
 %            TOP    RIGHT  DOWN   LEFT
