@@ -52,6 +52,7 @@ include "constraints/grid.mzn";
 include "constraints/trains.mzn";
 include "constraints/gates.mzn";
 include "constraints/dswitches.mzn";
+include "constraints/stations.mzn";
 
 % ============================================================
 % REDUNDANT CONSTRAINTS FOR BETTER PRUNING

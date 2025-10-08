@@ -68,8 +68,9 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
   % If the train has reached the target, it remains stationary.
   if r == TARGET.1 /\ c == TARGET.2 then
     (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
-  % elseif station_wait_time[t, time] > 0 then
-  %   (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
+  % If the train is waiting at a station, it remains stationary.
+  elseif station_wait_time[t, time] > 0 then
+    (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
   else
     % Verify that the train can enter the current piece from its entry direction.
     can_enter[piece, entry_dir] /\
