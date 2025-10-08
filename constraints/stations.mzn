@@ -135,19 +135,3 @@ constraint forall(st in 1..N_STATIONS)(
   )
 );
 
-% --- Redundant Constraint for Better Pruning ---
-% If a train has stations, it must visit all of them before the maximum time minus waiting time.
-constraint redundant_constraint(
-  forall(t in 1..N_TRAINS where train_station_count[t] > 0)(
-    forall(s in 1..train_station_count[t] where train_station_indices[t, s] > 0)(
-      let {
-        int: st_idx = train_station_indices[t, s];
-        int: station_r = STATIONS[st_idx].1;
-        int: station_c = STATIONS[st_idx].2;
-      } in
-      exists(time in 0..MAX_TIME-2)(
-        train_row[t, time] = station_r /\ train_col[t, time] = station_c
-      )
-    )
-  )
-);

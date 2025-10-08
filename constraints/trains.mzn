@@ -115,12 +115,6 @@ constraint forall(t in 1..N_TRAINS-1) (
   arrival_time[t] < arrival_time[t+1]
 );
 
-% --- Solver Hints for Better Performance ---
-% Add implicit constraint to guide search towards earlier arrivals
-constraint forall(t in 1..N_TRAINS-1)(
-    arrival_time[t] + 1 <= arrival_time[t+1]
-);
-
 % --- No Collision Constraint ---
 % Ensures that no two trains occupy the same cell at the same time (before either arrives).
 constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME)(

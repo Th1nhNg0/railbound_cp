@@ -54,36 +54,8 @@ include "constraints/gates.mzn";
 include "constraints/dswitches.mzn";
 include "constraints/stations.mzn";
 
-% ============================================================
-% REDUNDANT CONSTRAINTS FOR BETTER PRUNING
-% ============================================================
 
-% Redundant constraint: Sum of arrival times has a lower bound
-constraint redundant_constraint(
-    sum(t in 1..N_TRAINS)(arrival_time[t]) >= N_TRAINS * (N_TRAINS + 1) div 2
-);
 
-% Redundant constraint: Each train must have enough time remaining for later trains
-constraint redundant_constraint(
-    forall(t in 1..N_TRAINS-1)(arrival_time[t] <= MAX_TIME - (N_TRAINS - t))
-);
-
-% Redundant constraint: At least one train must reach the target
-constraint redundant_constraint(
-    exists(t in 1..N_TRAINS)(arrival_time[t] <= MAX_TIME)
-);
-
-solve :: seq_search([
-    int_search(arrival_time, first_fail, indomain_min),
-    int_search([grid[r,c] | r in 1..H, c in 1..W], input_order, indomain_min)
-])
-minimize sum(r in 1..H, c in 1..W)(
-  bool2int(grid[r, c] != EMPTY /\
-       not exists(i in 1..N_INIT_POS)(
-         INIT_POS[i].1 = r /\ INIT_POS[i].2 = c
-       )
-        /\ not (grid[r, c] in TUNNELS_SET)
-       )
-);
+solve satisfy;
 
 include "formatting.mzn";
