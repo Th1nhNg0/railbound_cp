@@ -118,7 +118,7 @@ echo "Time Limit : $TIME_LIMIT ms"
 echo "Levels     : $(echo "${LEVEL_DIRS_ARRAY[@]}" | sed 's|data/||g; s|/||g' | tr '\n' ',' | sed 's/,$//')"
 echo "Output CSV : $csvfile"
 echo "Summary    : $summaryfile"
-echo -e "Command    : minizinc --solver $SOLVER --time-limit $TIME_LIMIT --statistics --free-search ${PARALLEL:+ -p $PARALLEL} $MODEL_FILE <Data>${GRAY}"
+echo "Command    : minizinc --solver $SOLVER --time-limit $TIME_LIMIT --statistics ${PARALLEL:+ -p $PARALLEL} $MODEL_FILE <Data>${GRAY}"
 echo -e "${CYAN}============================================================${NC}\n"
 
 # --- Initialize CSV and Statistics ---
@@ -170,7 +170,7 @@ for level_dir in "${LEVEL_DIRS_ARRAY[@]}"; do
         
         # Execute the MiniZinc solver and capture output, exit code, and timing.
         start_time=$(date +%s)
-        output=$(minizinc --solver "$SOLVER" --time-limit "$TIME_LIMIT" --statistics --free-search ${PARALLEL:+-p $PARALLEL} "$MODEL_FILE" "$puzzle_file" 2>&1)
+        output=$(minizinc --solver "$SOLVER" --time-limit "$TIME_LIMIT" --statistics ${PARALLEL:+-p $PARALLEL} "$MODEL_FILE" "$puzzle_file" 2>&1)
         exit_code=$?
         end_time=$(date +%s)
         duration=$(( (end_time - start_time) * 1000 ))
