@@ -261,17 +261,10 @@
                 // (keep the original piece visible)
                 if (initPos) {
                   const [, , track] = initPos;
-                  if (track.e === "EMPTY") {
-                    const img = document.createElement("img");
-                    img.src = "images/4 Fence.svg";
-                    img.alt = "Fence";
-                    cell.appendChild(img);
-                  } else {
-                    const img = document.createElement("img");
-                    img.src = `images/${track.e}.svg`;
-                    img.alt = track.e;
-                    cell.appendChild(img);
-                  }
+                  const img = document.createElement("img");
+                  img.src = `images/${track.e}.svg`;
+                  img.alt = track.e;
+                  cell.appendChild(img);
                 } else if (tunnel) {
                   const [r_A, c_A, dir_A, r_B, c_B, dir_B] = tunnel;
                   const isTunnelA = r_A === row + 1 && c_A === col + 1;
@@ -318,17 +311,11 @@
                 // Draw initial state
                 if (initPos) {
                   const [, , track] = initPos;
-                  if (track.e === "EMPTY") {
-                    const img = document.createElement("img");
-                    img.src = "images/4 Fence.svg";
-                    img.alt = "Fence";
-                    cell.appendChild(img);
-                  } else {
-                    const img = document.createElement("img");
-                    img.src = `images/${track.e}.svg`;
-                    img.alt = track.e;
-                    cell.appendChild(img);
-                  }
+
+                  const img = document.createElement("img");
+                  img.src = `images/${track.e}.svg`;
+                  img.alt = track.e;
+                  cell.appendChild(img);
                 }
 
                 if (tunnel) {

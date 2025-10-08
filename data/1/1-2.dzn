@@ -9,14 +9,14 @@ TARGET=(1,6);
 TRAINS=[(3,1,TOP)];
 
 INIT_POS=[
-(1,4,EMPTY),
+(1,4,ROCK),
 (1,6,STRAIGHT_RL),
-(2,2,EMPTY),
-(2,4,EMPTY),
-(2,6,EMPTY),
+(2,2,ROCK),
+(2,4,ROCK),
+(2,6,ROCK),
 (3,1,STRAIGHT_TD),
-(3,2,EMPTY),
-(3,6,EMPTY),
+(3,2,ROCK),
+(3,6,ROCK),
 ];
 TUNNEL_PAIRS=[];
 

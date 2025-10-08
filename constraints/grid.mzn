@@ -4,14 +4,12 @@
 
 % --- Track Limit Constraint ---
 % Ensures the number of placed tracks does not exceed MAX_TRACKS.
-constraint sum(r in 1..H, c in 1..W)(
-  bool2int(grid[r, c] != EMPTY /\
-       not exists(i in 1..N_INIT_POS)(
-         INIT_POS[i].1 = r /\ INIT_POS[i].2 = c
-       )
-        /\ not (grid[r, c] in TUNNELS_SET)
-       )
-) <= MAX_TRACKS;
+% Track Limit Constraint: Count only non-empty, non-initial, non-tunnel cells as placed tracks.
+int: INIT_EMPTY = W*H - (N_INIT_POS + 2 * N_TUNNELS);
+constraint
+  INIT_EMPTY - sum(r in 1..H, c in 1..W)(
+      bool2int(grid[r, c] == EMPTY)
+    ) <= MAX_TRACKS;
 
 % --- Initial Position Constraint ---
 % Ensures that pre-placed pieces are correctly placed on the grid.
@@ -41,9 +39,10 @@ constraint forall(r in 1..H, c in 1..W)(
 );
 
 % --- Train Path Validity Constraint ---
-% Ensures that trains only move on non-empty cells.
+% Ensures that trains only move on valid track cells (not EMPTY and not ROCK).
 constraint forall(t in 1..N_TRAINS, i in 1..arrival_time[t])(
-    grid[train_row[t, i], train_col[t, i]] != EMPTY
+    grid[train_row[t, i], train_col[t, i]] != EMPTY /\
+    grid[train_row[t, i], train_col[t, i]] != ROCK
 );
 
 % --- Bounds Check Predicate ---

@@ -148,7 +148,8 @@ array[Piece, Dir] of bool: can_enter = array2d(Piece, Dir, [
   true,  false, false, false,  % TUNNEL_T
   false, true,  false, false,  % TUNNEL_R
   false, false, true,  false,  % TUNNEL_D
-  false, false, false, true    % TUNNEL_L
+  false, false, false, true,   % TUNNEL_L
+  false, false, false, false   % ROCK
 ]);
 
 % can_exit[p, d] is true if a train can exit a piece `p` towards direction `d`.
@@ -188,7 +189,8 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
   true,  false, false, false,  % TUNNEL_T
   false, true,  false, false,  % TUNNEL_R
   false, false, true,  false,  % TUNNEL_D
-  false, false, false, true    % TUNNEL_L
+  false, false, false, true,   % TUNNEL_L
+  false, false, false, false   % ROCK
 ]);
 
 % exit_of[p, d] determines the exit direction when entering piece `p` from direction `d`.
@@ -228,7 +230,8 @@ array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
   TOP,   TOP,   TOP,   TOP,   % TUNNEL_T
   RIGHT, RIGHT, RIGHT, RIGHT, % TUNNEL_R
   DOWN,  DOWN,  DOWN,  DOWN,  % TUNNEL_D
-  LEFT,  LEFT,  LEFT,  LEFT   % TUNNEL_L
+  LEFT,  LEFT,  LEFT,  LEFT,  % TUNNEL_L
+  TOP,   TOP,   TOP,   TOP    % ROCK
 ]);
 
 % --- Dynamic Switch Toggle Mapping ---
@@ -268,7 +271,8 @@ array[Piece] of Piece: dswitch_toggle = [
   TUNNEL_T,      % TUNNEL_T
   TUNNEL_R,      % TUNNEL_R
   TUNNEL_D,      % TUNNEL_D
-  TUNNEL_L       % TUNNEL_L
+  TUNNEL_L,      % TUNNEL_L
+  ROCK           % ROCK
 ];
 
 % Function to get the effective piece type for a DSWITCH based on its toggle state.

@@ -1,3 +1,4 @@
+include "globals.mzn";
 include "lib/types.mzn";
 
 int: W;        
@@ -18,7 +19,7 @@ array[int] of tuple(int, int, int): STATIONS;
 % ============================================================
 
 int: N_TRAINS = length(TRAINS);
-int: N_INIT_POS = length(INIT_POS);
+int: N_INIT_POS = length(INIT_POS);  
 int: N_TUNNELS = length(TUNNEL_PAIRS);
 int: N_GATES = length(GATES);
 int: N_ACTIVATIONS = length(ACTIVATIONS);

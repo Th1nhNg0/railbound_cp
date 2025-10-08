@@ -35,7 +35,8 @@ enum Piece = {
   TUNNEL_T,     % Tunnel entry allowing entry from Top.
   TUNNEL_R,     % Tunnel entry allowing entry from Right.
   TUNNEL_D,     % Tunnel entry allowing entry from Down.
-  TUNNEL_L      % Tunnel entry allowing entry from Left.
+  TUNNEL_L,     % Tunnel entry allowing entry from Left.
+  ROCK          % Rock piece (impassable terrain).
 };
 
 type Pos = tuple(int, int, Piece);
