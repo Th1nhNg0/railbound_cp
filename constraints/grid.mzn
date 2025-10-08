@@ -64,7 +64,8 @@ constraint forall(r in 1..H, c in 1..W)(
     } in
     bool2int(
       in_bounds(nr, nc) /\
-      can_connect[grid[nr, nc], opposite[d]] /\can_connect[grid[r, c], d]
+      can_connect[grid[r, c], d] /\
+      can_connect[grid[nr, nc], opposite[d]]
     )
   ) = 3
 );

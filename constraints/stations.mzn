@@ -36,20 +36,24 @@ array[1..N_TRAINS] of int: train_station_count = [
 
 % --- Station Visitation Tracking ---
 % Track whether each station has been visited by its assigned train by each timestep.
-constraint forall(st in 1..max(1, N_STATIONS), time in 0..MAX_TIME) (
-  if N_STATIONS = 0 then
-    station_visited_by_time[st, time] = false
-  else
+constraint if N_STATIONS > 0 then
+  forall(st in 1..N_STATIONS)(
     let {
       int: train_id = STATIONS[st].3;
       int: station_r = STATIONS[st].1;
       int: station_c = STATIONS[st].2;
-      var bool: train_at_station_now = (train_row[train_id, time] = station_r /\ train_col[train_id, time] = station_c);
-      var bool: was_visited_before = if time = 0 then false else station_visited_by_time[st, time-1] endif;
     } in
-    station_visited_by_time[st, time] = (train_at_station_now \/ was_visited_before)
-  endif
-);
+    forall(time in 0..MAX_TIME)(
+      let {
+        var bool: train_at_station_now = (train_row[train_id, time] = station_r /\ train_col[train_id, time] = station_c);
+        var bool: was_visited_before = if time = 0 then false else station_visited_by_time[st, time-1] endif;
+      } in
+      station_visited_by_time[st, time] = (train_at_station_now \/ was_visited_before)
+    )
+  )
+else
+  forall(time in 0..MAX_TIME)(station_visited_by_time[1, time] = false)
+endif;
 
 % --- Station Wait Time Constraints ---
 % Manage the waiting behavior at stations.

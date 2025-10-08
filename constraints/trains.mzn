@@ -13,7 +13,7 @@ constraint forall(t in 1..N_TRAINS) (
     int: intended_c = c0 + dc[dir0];
     Dir: intended_entry_dir = opposite[dir0];
     var bool: blocked_by_gate =
-      if N_GATES > 0 /\ cell_has_gate[intended_r, intended_c] then
+      if cell_has_gate[intended_r, intended_c] then
         not gate_open[gate_index_at[intended_r, intended_c], 1]
       else false endif;
   } in
@@ -47,16 +47,13 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
     var 1..W: intended_c;
     var Dir: intended_entry_dir;
     var bool: blocked_by_gate =
-      if N_GATES = 0 then false
-      else
-        if cell_has_gate[intended_r, intended_c] then
-          not gate_open[gate_index_at[intended_r, intended_c], time+1]
-        else false endif
-      endif;
+      if cell_has_gate[intended_r, intended_c] then
+        not gate_open[gate_index_at[intended_r, intended_c], time+1]
+      else false endif;
     var bool: is_dswitch = piece in DSWITCHES_SET;
     % var bool: is_eswitch = piece in ESWITCHES_SET;
     var bool: dswitch_state =
-      if N_DSWITCHES > 0 /\ is_dswitch /\ cell_has_dswitch[r, c] then
+      if is_dswitch then
         dswitch_toggled[dswitch_index_at[r, c], time]
       else false endif;
     % var bool: eswitch_state =
@@ -82,9 +79,11 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
          var tuple(int, int): dest = tunnel_dest[r, c];
          var int: dest_exit_dir = tunnel_exit_dir[r, c];
          var Dir: dest_exit_dir_enum = to_enum(Dir, dest_exit_dir);
+         var int: dest_r = dest.1;
+         var int: dest_c = dest.2;
        } in
-       intended_r = dest.1 + dr[dest_exit_dir_enum] /\
-       intended_c = dest.2 + dc[dest_exit_dir_enum] /\
+       intended_r = dest_r + dr[dest_exit_dir_enum] /\
+       intended_c = dest_c + dc[dest_exit_dir_enum] /\
        intended_entry_dir = opposite[dest_exit_dir_enum]
      else
        intended_r = r + dr[exit_dir] /\
@@ -118,7 +117,7 @@ constraint forall(t in 1..N_TRAINS-1) (
 % --- No Collision Constraint ---
 % Ensures that no two trains occupy the same cell at the same time (before either arrives).
 constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME)(
-    (i <= arrival_time[t1] /\ i <= arrival_time[t2]) ->
+    (i < arrival_time[t1] /\ i < arrival_time[t2]) ->
     (train_row[t1, i] != train_row[t2, i] \/ train_col[t1, i] != train_col[t2, i])
 );
 
