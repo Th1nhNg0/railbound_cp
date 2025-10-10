@@ -44,6 +44,11 @@ array[0..max(1, N_GATES), 0..MAX_TIME] of var bool: gate_open;
 % For example, DSWITCH_T_D_R can toggle to DSWITCH_D_T_R.
 % We track this as a boolean: false=original orientation, true=toggled orientation.
 array[1..max(1, N_DSWITCHES), 0..MAX_TIME] of var bool: dswitch_toggled;
+% The state of each exit-triggered switch at each timestep.
+% An ESWITCH has two possible states representing its toggled configuration.
+% For example, ESWITCH_T_D_R can toggle to ESWITCH_D_T_R.
+% We track this as a boolean: false=original orientation, true=toggled orientation.
+array[1..max(1, N_ESWITCHES), 0..MAX_TIME] of var bool: eswitch_toggled;
 
 % ============================================================
 % CONSTRAINTS
@@ -53,6 +58,7 @@ include "constraints/grid.mzn";
 include "constraints/trains.mzn";
 include "constraints/gates.mzn";
 include "constraints/dswitches.mzn";
+include "constraints/eswitches.mzn";
 include "constraints/stations.mzn";
 
 

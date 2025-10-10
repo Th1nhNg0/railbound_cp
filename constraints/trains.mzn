@@ -51,16 +51,19 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
         not gate_open[gate_index_at[intended_r, intended_c], time+1]
       else false endif;
     var bool: is_dswitch = piece in DSWITCHES_SET;
-    % var bool: is_eswitch = piece in ESWITCHES_SET;
+    var bool: is_eswitch = piece in ESWITCHES_SET;
     var bool: dswitch_state =
       if is_dswitch then
         dswitch_toggled[dswitch_index_at[r, c], time]
       else false endif;
-    % var bool: eswitch_state =
-    %   if N_ESWITCHES > 0 /\ is_eswitch /\ cell_has_eswitch[r, c] then
-    %     eswitch_swapped[eswitch_index_at[r, c], time]
-    %   else false endif;
-    var Piece: effective_piece = if is_dswitch then dswitch_effective_piece(piece, dswitch_state) else piece endif;
+    var bool: eswitch_state =
+      if N_ESWITCHES > 0 /\ is_eswitch /\ cell_has_eswitch[r, c] then
+        eswitch_toggled[eswitch_index_at[r, c], time]
+      else false endif;
+    var Piece: effective_piece = 
+      if is_dswitch then dswitch_effective_piece(piece, dswitch_state) 
+      elseif is_eswitch then eswitch_effective_piece(piece, eswitch_state)
+      else piece endif;
   } in
   % If the train has reached the target, it remains stationary.
   if r == TARGET.1 /\ c == TARGET.2 then

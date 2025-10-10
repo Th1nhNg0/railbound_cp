@@ -1,0 +1,41 @@
+% constraints/eswitches.mzn
+%
+% Defines constraints for exit-triggered switch mechanics.
+%
+% Exit-triggered switches (ESWITCHES) toggle their orientation each time a train
+% exits from them. The constraints ensure:
+% 1. ESWITCHES start in their default (non-toggled) state.
+% 2. The state of an ESWITCH flips when a train exits the ESWITCH cell.
+% 3. The exit direction depends on the current toggle state.
+
+% --- ESWITCH Initial State ---
+% All exit-triggered switches start in the non-toggled state at time 0.
+constraint if N_ESWITCHES > 0 then
+    forall(es in 1..N_ESWITCHES)(
+        eswitch_toggled[es, 0] = false
+    )
+else true endif;
+
+% --- ESWITCH State Propagation ---
+% Manages how exit-triggered switch states change over time based on train exits.
+constraint if N_ESWITCHES > 0 then
+    forall(es in 1..N_ESWITCHES, t in 1..MAX_TIME)(
+        let {
+            % Count the number of trains that exited from this eswitch cell in the previous timestep.
+            % A train exits when it was at the eswitch cell at time t-1 but is somewhere else at time t.
+            var int: num_exits = sum(tr in 1..N_TRAINS)(
+                bool2int(
+                    % Train was at eswitch cell at time t-1
+                    train_row[tr, t - 1] = ESWITCHES_DERIVED[es].1 /\
+                    train_col[tr, t - 1] = ESWITCHES_DERIVED[es].2 /\
+                    % Train is NOT at this cell at time t (has exited)
+                    (train_row[tr, t] != ESWITCHES_DERIVED[es].1 \/ train_col[tr, t] != ESWITCHES_DERIVED[es].2)
+                )
+            );
+            % Toggle occurs if an odd number of exits happened.
+            var bool: should_toggle = (num_exits mod 2) = 1;
+        } in
+        % Exit-triggered switch state at time t is toggled from t-1 if should_toggle is true, otherwise unchanged.
+        eswitch_toggled[es, t] = if should_toggle then not eswitch_toggled[es, t - 1] else eswitch_toggled[es, t - 1] endif
+    )
+else true endif;
