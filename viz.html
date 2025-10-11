@@ -119,14 +119,35 @@
   </head>
   <body>
     <main class="flex items-center justify-center min-h-screen">
-      <div id="gridContainer"></div>
+      <div class="flex flex-col items-center gap-4 w-full max-w-5xl px-4">
+        <div id="gridContainer"></div>
+        <div
+          id="timelineControls"
+          class="w-full max-w-md mx-auto"
+          style="display: none"
+        >
+          <label
+            for="timeSlider"
+            class="block text-center text-lg font-semibold mb-2"
+          >
+            Time step: <span id="timeLabel">0</span>
+          </label>
+          <input
+            type="range"
+            id="timeSlider"
+            class="w-full"
+            min="0"
+            max="0"
+            value="0"
+          />
+        </div>
+      </div>
     </main>
     <script src="/minizinc-ide.js"></script>
     <script>
       (async function () {
         // getUserData can be used to retrieve the JSON data passed to vis_server()
         const userData = await MiniZincIDE.getUserData();
-        console.log({ userData });
         const {
           grid_height,
           grid_width,
@@ -141,6 +162,129 @@
         } = userData;
 
         const container = document.getElementById("gridContainer");
+        const timelineControls = document.getElementById("timelineControls");
+        const timeSlider = document.getElementById("timeSlider");
+        const timeLabel = document.getElementById("timeLabel");
+
+        const DIR_STRING_TO_NUM = { TOP: 1, RIGHT: 2, DOWN: 3, LEFT: 4 };
+        const DIR_NUM_TO_STRING = { 1: "TOP", 2: "RIGHT", 3: "DOWN", 4: "LEFT" };
+
+        function resolveDirectionValue(direction) {
+          if (direction == null) {
+            return null;
+          }
+
+          if (typeof direction === "object" && "e" in direction) {
+            const value = direction.e;
+            if (typeof value === "string") {
+              return DIR_STRING_TO_NUM[value] ?? null;
+            }
+            if (typeof value === "number") {
+              return DIR_NUM_TO_STRING[value] ? value : null;
+            }
+          }
+
+          if (typeof direction === "string") {
+            return DIR_STRING_TO_NUM[direction] ?? null;
+          }
+
+          if (typeof direction === "number") {
+            return DIR_NUM_TO_STRING[direction] ? direction : null;
+          }
+
+          return null;
+        }
+
+        function directionFromDelta(from, to) {
+          if (!from || !to) {
+            return null;
+          }
+
+          const rowDelta = (to.row ?? 0) - (from.row ?? 0);
+          const colDelta = (to.col ?? 0) - (from.col ?? 0);
+
+          if (rowDelta === -1 && colDelta === 0) {
+            return DIR_STRING_TO_NUM.TOP;
+          }
+          if (rowDelta === 1 && colDelta === 0) {
+            return DIR_STRING_TO_NUM.DOWN;
+          }
+          if (rowDelta === 0 && colDelta === 1) {
+            return DIR_STRING_TO_NUM.RIGHT;
+          }
+          if (rowDelta === 0 && colDelta === -1) {
+            return DIR_STRING_TO_NUM.LEFT;
+          }
+
+          return null;
+        }
+
+        function determineStepDirections(pathPositions, initialDirection = null) {
+          if (!Array.isArray(pathPositions) || pathPositions.length === 0) {
+            return [];
+          }
+
+          const steps = [];
+          let lastDirection = initialDirection ?? null;
+
+          for (let i = 0; i < pathPositions.length; i++) {
+            const current = pathPositions[i];
+            const next = pathPositions[i + 1];
+            const previous = pathPositions[i - 1];
+
+            let direction = directionFromDelta(current, next);
+
+            if (direction == null) {
+              direction = directionFromDelta(previous, current);
+            }
+
+            if (direction == null) {
+              direction = lastDirection;
+            }
+
+            if (direction == null) {
+              direction = initialDirection;
+            }
+
+            if (direction != null) {
+              lastDirection = direction;
+            }
+
+            steps.push({
+              ...current,
+              direction: lastDirection,
+            });
+          }
+
+          return steps;
+        }
+
+        const initialTrainPositions = (trains ?? []).map((train, idx) => ({
+          row: train?.[0],
+          col: train?.[1],
+          direction: resolveDirectionValue(train?.[2]),
+          idx,
+        }));
+
+        let currentGridData = null;
+        let trainPaths = [];
+        let trainPathLengths = [];
+        let currentTimeStep = 0;
+        let maxTimeStep = 0;
+        let timeSliderInUpdate = false;
+
+        function safeParseJSON(value, fallback) {
+          if (typeof value !== "string") {
+            return fallback;
+          }
+
+          try {
+            return JSON.parse(value);
+          } catch (error) {
+            console.warn("Failed to parse JSON payload:", error);
+            return fallback;
+          }
+        }
 
         // Generate different colors for each tunnel pair
         function getTunnelColor(tunnelIndex) {
@@ -170,14 +314,7 @@
         // Direction: TOP=1, RIGHT=2, DOWN=3, LEFT=4 (or string names)
         // Tunnels default to LEFT (0°), Cars default to RIGHT (0°)
         function getRotation(direction, isCarImage = false) {
-          // Convert string direction to number if needed
-          const dirValue = direction?.e;
-          let dirNum = dirValue;
-
-          if (typeof dirValue === "string") {
-            const dirMap = { TOP: 1, RIGHT: 2, DOWN: 3, LEFT: 4 };
-            dirNum = dirMap[dirValue];
-          }
+          const dirNum = resolveDirectionValue(direction);
 
           if (isCarImage) {
             // Car images default to RIGHT
@@ -201,7 +338,10 @@
         }
 
         // Draw grid
-        function drawGrid(gridData = null) {
+        function drawGrid(
+          gridData = null,
+          activeTrains = initialTrainPositions
+        ) {
           container.innerHTML = "";
           container.style.gridTemplateColumns = `repeat(${grid_width}, 80px)`;
           container.style.gridTemplateRows = `repeat(${grid_height}, 80px)`;
@@ -357,17 +497,16 @@
               }
 
               // Add trains
-              const train = trains?.find(
-                ([r, c]) => r === row + 1 && c === col + 1
+              const train = activeTrains?.find(
+                (t) => t?.row === row + 1 && t?.col === col + 1
               );
               if (train) {
-                const [, , direction] = train;
-                const trainIndex = trains.indexOf(train);
-                const rotation = getRotation(direction, true);
+                const rotation = getRotation(train.direction, true);
 
                 const img = document.createElement("img");
-                img.src = `images/Car ${trainIndex + 1}.svg`;
-                img.alt = `Car ${trainIndex + 1}`;
+                const carIndex = (train.idx ?? 0) + 1;
+                img.src = `images/Car ${carIndex}.svg`;
+                img.alt = `Car ${carIndex}`;
                 img.style.transform = `rotate(${rotation}deg)`;
                 img.style.zIndex = "10";
                 cell.appendChild(img);
@@ -434,15 +573,167 @@
           }
         }
 
+        function getTrainPositionsAtTime(timeStep) {
+          if (
+            typeof timeStep !== "number" ||
+            Number.isNaN(timeStep) ||
+            timeStep < 0
+          ) {
+            return initialTrainPositions;
+          }
+
+          if (timeStep === 0) {
+            return initialTrainPositions;
+          }
+
+          const desiredStep = Math.min(
+            Math.floor(timeStep),
+            maxTimeStep
+          );
+
+          if (!Array.isArray(trainPaths) || trainPaths.length === 0) {
+            return initialTrainPositions;
+          }
+
+          const trainCount = Math.max(
+            trainPaths.length,
+            initialTrainPositions.length
+          );
+
+          const positions = [];
+
+          for (let idx = 0; idx < trainCount; idx++) {
+            const path = trainPaths[idx];
+            if (Array.isArray(path) && path.length > 0) {
+              const stepIndex = Math.min(desiredStep - 1, path.length - 1);
+              positions.push(
+                path[stepIndex] || initialTrainPositions[idx] || null
+              );
+            } else if (initialTrainPositions[idx]) {
+              positions.push(initialTrainPositions[idx]);
+            }
+          }
+
+          return positions.filter(Boolean);
+        }
+
         // Wait for tunnel SVG to load before drawing initial grid
         await tunnelSvgPromise;
-        drawGrid();
+        drawGrid(null, initialTrainPositions);
 
         function setSolution(data) {
-          const grid = JSON.parse(data.grid);
-          drawGrid(grid);
-          const trains = JSON.parse(data.trains);
+          if (!data) {
+            return;
+          }
+
+          currentGridData = safeParseJSON(data?.grid, null);
+
+          const rawTrainPaths = safeParseJSON(data?.train_paths, []);
+          const rawPathLengths = safeParseJSON(
+            data?.train_path_lengths,
+            []
+          );
+          trainPathLengths = Array.isArray(rawPathLengths)
+            ? rawPathLengths.map((len) => Number(len) || 0)
+            : [];
+
+          trainPaths = Array.isArray(rawTrainPaths)
+            ? rawTrainPaths.map((path, idx) => {
+                if (!Array.isArray(path)) {
+                  return [];
+                }
+
+                const positions = path
+                  .map((step) => {
+                    if (!Array.isArray(step)) {
+                      return null;
+                    }
+                    const [row, col] = step;
+                    if (
+                      typeof row !== "number" ||
+                      typeof col !== "number"
+                    ) {
+                      return null;
+                    }
+                    return { row, col };
+                  })
+                  .filter(Boolean);
+
+                const computedSteps = determineStepDirections(
+                  positions,
+                  initialTrainPositions[idx]?.direction ?? null
+                );
+
+                return computedSteps.map((step) => ({
+                  ...step,
+                  idx,
+                }));
+              })
+            : [];
+
+          const derivedMaxTimeFromPaths =
+            trainPaths.length > 0
+              ? Math.max(...trainPaths.map((path) => path.length), 0)
+              : 0;
+
+          const derivedMaxTimeFromLengths =
+            trainPathLengths.length > 0
+              ? Math.max(...trainPathLengths, 0)
+              : 0;
+
+          const bestMaxTime = Math.max(
+            derivedMaxTimeFromPaths,
+            derivedMaxTimeFromLengths
+          );
+
+          maxTimeStep = Number.isFinite(bestMaxTime) ? bestMaxTime : 0;
+
+          if (maxTimeStep > 0 || initialTrainPositions.length > 0) {
+            timelineControls.style.display = "block";
+            timeSlider.min = 0;
+            timeSlider.max = maxTimeStep;
+            if (!timeSliderInUpdate) {
+              currentTimeStep = currentTimeStep
+                ? Math.min(currentTimeStep, maxTimeStep)
+                : 0;
+              timeSlider.value = currentTimeStep;
+            }
+            timeLabel.textContent = `${currentTimeStep} / ${maxTimeStep}`;
+          } else {
+            timelineControls.style.display = "none";
+            currentTimeStep = 0;
+            timeSlider.value = 0;
+            timeSlider.min = 0;
+            timeSlider.max = 0;
+            timeLabel.textContent = "0";
+          }
+
+          drawGrid(
+            currentGridData,
+            getTrainPositionsAtTime(currentTimeStep)
+          );
         }
+
+        timeSlider.addEventListener("input", (event) => {
+          timeSliderInUpdate = true;
+
+          const sliderValue = Number(event.target.value);
+
+          const clampedValue = Math.min(
+            Math.max(sliderValue, 0),
+            maxTimeStep
+          );
+          currentTimeStep = clampedValue;
+          event.target.value = clampedValue;
+          timeLabel.textContent = `${clampedValue} / ${maxTimeStep}`;
+          drawGrid(
+            currentGridData,
+            clampedValue === 0
+              ? initialTrainPositions
+              : getTrainPositionsAtTime(currentTimeStep)
+          );
+          timeSliderInUpdate = false;
+        });
 
         // Visualise last solution on startup
         const numSols = await MiniZincIDE.getNumSolutions();

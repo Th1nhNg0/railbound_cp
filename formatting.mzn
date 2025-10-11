@@ -14,7 +14,17 @@ any: initial_data = (
   stations: [ (STATIONS[st].1, STATIONS[st].2, STATIONS[st].3) | st in 1..N_STATIONS ]
 );
 any: solution_data :: output_only = (
-  grid: showJSON(grid)
+  grid: showJSON(grid),
+  train_paths: showJSON([
+    (
+      if fix(arrival_time[t]) > 0 then
+        [ [ train_row[t, time], train_col[t, time] ] | time in 1..fix(arrival_time[t]) ]
+      else []
+      endif
+    )
+    | t in 1..N_TRAINS
+  ]),
+  train_path_lengths: showJSON([ fix(arrival_time[t]) | t in 1..N_TRAINS ])
 );
 output :: vis_server("viz.html", initial_data) solution_data;
 output [
@@ -37,6 +47,13 @@ output [
 ++
 [
   "Train \(t): arrival at time \(arrival_time[t])\n" ++
-  "  Path: " ++ show([ (train_row[t, time], train_col[t, time]) | time in 1..fix(arrival_time[t]) ]) ++ "\n"
+  "  Path: " ++ show(
+    (
+      if fix(arrival_time[t]) > 0 then
+        [ (train_row[t, time], train_col[t, time]) | time in 1..fix(arrival_time[t]) ]
+      else []
+      endif
+    )
+  ) ++ "\n"
   | t in 1..N_TRAINS
 ];
