@@ -328,3 +328,8 @@ function var Piece: dswitch_effective_piece(var Piece: base_piece, var bool: tog
 % Function to get the effective piece type for an ESWITCH based on its toggle state.
 function var Piece: eswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
   if toggled then eswitch_toggle[base_piece] else base_piece endif;
+
+function var Piece: grid_at(var int: r, var int: c) =
+  if r < 1 \/ r > H \/ c < 1 \/ c > W then ROCK
+  else grid[(r-1) * W + c]
+  endif;

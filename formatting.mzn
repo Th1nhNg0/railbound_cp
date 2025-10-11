@@ -14,7 +14,7 @@ any: initial_data = (
   stations: [ (STATIONS[st].1, STATIONS[st].2, STATIONS[st].3) | st in 1..N_STATIONS ]
 );
 any: solution_data :: output_only = (
-  grid: showJSON(grid),
+  grid: showJSON(array2d(1..H, 1..W, grid)),
   train_paths: showJSON([
     (
       if fix(arrival_time[t]) > 0 then
@@ -32,14 +32,14 @@ output [
   "SOLUTION FOUND\n",
   "============================================================\n\n",
   "GRID LAYOUT:\n",
-  show2d(grid), "\n\n",
+  show2d(array2d(1..H, 1..W, grid)), "\n\n",
   "TIME_USED: \(max(arrival_time))\n",
   "TRACK_USED: \(sum(r in 1..H, c in 1..W)(
-  bool2int(grid[r, c] != EMPTY /\
+  bool2int(grid[(r-1)*W + c] != EMPTY /\
        not exists(i in 1..N_INIT_POS)(
          INIT_POS[i].1 = r /\ INIT_POS[i].2 = c
        )
-        /\ not (grid[r, c] in TUNNELS_SET)
+        /\ not (grid[(r-1)*W + c] in TUNNELS_SET)
        )))"
 ]
 ++

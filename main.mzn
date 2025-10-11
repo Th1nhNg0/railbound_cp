@@ -32,7 +32,7 @@ include "lib/globals.mzn";
 % ============================================================
 % DECISION VARIABLES
 % ============================================================
-array[1..H, 1..W] of var Piece: grid;
+array[1..H*W] of var Piece: grid;
 array[1..N_TRAINS, 0..MAX_TIME] of var 1..H: train_row;
 array[1..N_TRAINS, 0..MAX_TIME] of var 1..W: train_col;
 array[1..N_TRAINS, 1..MAX_TIME] of var Dir: train_dir;

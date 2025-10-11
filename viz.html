@@ -167,7 +167,12 @@
         const timeLabel = document.getElementById("timeLabel");
 
         const DIR_STRING_TO_NUM = { TOP: 1, RIGHT: 2, DOWN: 3, LEFT: 4 };
-        const DIR_NUM_TO_STRING = { 1: "TOP", 2: "RIGHT", 3: "DOWN", 4: "LEFT" };
+        const DIR_NUM_TO_STRING = {
+          1: "TOP",
+          2: "RIGHT",
+          3: "DOWN",
+          4: "LEFT",
+        };
 
         function resolveDirectionValue(direction) {
           if (direction == null) {
@@ -219,7 +224,10 @@
           return null;
         }
 
-        function determineStepDirections(pathPositions, initialDirection = null) {
+        function determineStepDirections(
+          pathPositions,
+          initialDirection = null
+        ) {
           if (!Array.isArray(pathPositions) || pathPositions.length === 0) {
             return [];
           }
@@ -586,10 +594,7 @@
             return initialTrainPositions;
           }
 
-          const desiredStep = Math.min(
-            Math.floor(timeStep),
-            maxTimeStep
-          );
+          const desiredStep = Math.min(Math.floor(timeStep), maxTimeStep);
 
           if (!Array.isArray(trainPaths) || trainPaths.length === 0) {
             return initialTrainPositions;
@@ -629,10 +634,7 @@
           currentGridData = safeParseJSON(data?.grid, null);
 
           const rawTrainPaths = safeParseJSON(data?.train_paths, []);
-          const rawPathLengths = safeParseJSON(
-            data?.train_path_lengths,
-            []
-          );
+          const rawPathLengths = safeParseJSON(data?.train_path_lengths, []);
           trainPathLengths = Array.isArray(rawPathLengths)
             ? rawPathLengths.map((len) => Number(len) || 0)
             : [];
@@ -649,10 +651,7 @@
                       return null;
                     }
                     const [row, col] = step;
-                    if (
-                      typeof row !== "number" ||
-                      typeof col !== "number"
-                    ) {
+                    if (typeof row !== "number" || typeof col !== "number") {
                       return null;
                     }
                     return { row, col };
@@ -677,9 +676,7 @@
               : 0;
 
           const derivedMaxTimeFromLengths =
-            trainPathLengths.length > 0
-              ? Math.max(...trainPathLengths, 0)
-              : 0;
+            trainPathLengths.length > 0 ? Math.max(...trainPathLengths, 0) : 0;
 
           const bestMaxTime = Math.max(
             derivedMaxTimeFromPaths,
@@ -708,10 +705,7 @@
             timeLabel.textContent = "0";
           }
 
-          drawGrid(
-            currentGridData,
-            getTrainPositionsAtTime(currentTimeStep)
-          );
+          drawGrid(currentGridData, getTrainPositionsAtTime(currentTimeStep));
         }
 
         timeSlider.addEventListener("input", (event) => {
@@ -719,10 +713,7 @@
 
           const sliderValue = Number(event.target.value);
 
-          const clampedValue = Math.min(
-            Math.max(sliderValue, 0),
-            maxTimeStep
-          );
+          const clampedValue = Math.min(Math.max(sliderValue, 0), maxTimeStep);
           currentTimeStep = clampedValue;
           event.target.value = clampedValue;
           timeLabel.textContent = `${clampedValue} / ${maxTimeStep}`;

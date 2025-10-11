@@ -38,7 +38,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
     var 1..H: r = train_row[t, time];
     var 1..W: c = train_col[t, time];
     var Dir: entry_dir = train_dir[t, time];
-    var Piece: piece = grid[r, c];
+    var Piece: piece = grid_at(r, c);
     var Dir: exit_dir;
     var 1..H: next_r = train_row[t, time+1];
     var 1..W: next_c = train_col[t, time+1];
@@ -94,7 +94,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
        intended_entry_dir = opposite[exit_dir] 
      endif) /\
     % The train must be able to enter the piece at the intended next cell.
-    can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
+    can_enter[grid_at(intended_r, intended_c), intended_entry_dir] /\
     % If the path is blocked by a gate, the train waits; otherwise, it moves.
     if blocked_by_gate then
       (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
@@ -135,12 +135,12 @@ constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1)
         let {
             var 1..H: r1_i = train_row[t1, i],
             var 1..W: c1_i = train_col[t1, i],
-            var 1..H: eff_r1 = if grid[r1_i, c1_i] in TUNNELS_SET then tunnel_dest[r1_i, c1_i].1 else r1_i endif,
-            var 1..W: eff_c1 = if grid[r1_i, c1_i] in TUNNELS_SET then tunnel_dest[r1_i, c1_i].2 else c1_i endif,
+            var 1..H: eff_r1 = if grid_at(r1_i, c1_i) in TUNNELS_SET then tunnel_dest[r1_i, c1_i].1 else r1_i endif,
+            var 1..W: eff_c1 = if grid_at(r1_i, c1_i) in TUNNELS_SET then tunnel_dest[r1_i, c1_i].2 else c1_i endif,
             var 1..H: r2_i = train_row[t2, i],
             var 1..W: c2_i = train_col[t2, i],
-            var 1..H: eff_r2 = if grid[r2_i, c2_i] in TUNNELS_SET then tunnel_dest[r2_i, c2_i].1 else r2_i endif,
-            var 1..W: eff_c2 = if grid[r2_i, c2_i] in TUNNELS_SET then tunnel_dest[r2_i, c2_i].2 else c2_i endif
+            var 1..H: eff_r2 = if grid_at(r2_i, c2_i) in TUNNELS_SET then tunnel_dest[r2_i, c2_i].1 else r2_i endif,
+            var 1..W: eff_c2 = if grid_at(r2_i, c2_i) in TUNNELS_SET then tunnel_dest[r2_i, c2_i].2 else c2_i endif
 
         } in 
         % The consequence: they cannot swap positions.
