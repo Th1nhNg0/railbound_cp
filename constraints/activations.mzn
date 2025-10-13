@@ -25,7 +25,7 @@ constraint forall(a in 1..MAX_ID)(
 constraint forall(a in 1..MAX_ID, t in 2..MAX_TIME)(
     should_toggle[a, t] = (sum(
         act in 1..N_ACTIVATIONS, tr in 1..N_TRAINS
-        where ACTIVATIONS[act].3 = a /\ arrival_time[tr] > t
+        where ACTIVATIONS[act].3 = a /\ arrival_time[tr] >= t
     )(
         bool2int(
             % Train is at activation cell at time t-1
