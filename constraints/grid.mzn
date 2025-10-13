@@ -45,27 +45,23 @@ constraint forall(t in 1..N_TRAINS, i in 1..arrival_time[t])(
     grid[train_row[t, i], train_col[t, i]] != ROCK
 );
 
-% --- Bounds Check Predicate ---
-predicate in_bounds(int: r, int: c) =
-  r >= 1 /\ r <= H /\ c >= 1 /\ c <= W;
-
-% --- Switch Connectivity Constraint ---
-% Ensures that switches have exactly 3 valid connecting neighbors.
+% --- Connectivity Constraint ---
+% Ensures that switches have exactly 3 and corners have exactly 2 valid connecting neighbors.
 constraint forall(r in 1..H, c in 1..W)(
-  % If this cell has a switch that's not pre-placed
-  ((grid[r, c] in SWITCHES_SET) /\
+  % If this cell has a switch or corner that's not pre-placed
+  (((grid[r, c] in SWITCHES_SET) \/ (grid[r, c] in CORNERS_SET)) /\
   not cell_is_init[r, c])
   ->
-  % Then the number of directions that have valid connecting neighbors is 3
+  % Then the number of directions that have valid connecting neighbors matches requirements
   sum(d in Dir)(
     let {
       int: nr = r + dr[d];
       int: nc = c + dc[d];
     } in
     bool2int(
-      in_bounds(nr, nc) /\
+      nr >= 1 /\ nr <= H /\ nc >= 1 /\ nc <= W /\ 
       can_connect[grid[r, c], d] /\
       can_connect[grid[nr, nc], opposite[d]]
     )
-  ) = 3
+  ) = (if grid[r, c] in SWITCHES_SET then 3 else 2 endif)
 );

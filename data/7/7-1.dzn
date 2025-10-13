@@ -7,6 +7,8 @@ MAX_TRACKS=3;
 TARGET=(2,5);
 
 TRAINS=[(2,1,RIGHT)];
+DECOYS =[(2,4,LEFT)];
+
 
 INIT_POS=[
 (2,1,STRAIGHT_RL),
@@ -20,5 +22,3 @@ ACTIVATIONS=[];
 
 DSWITCHES=[];
 STATIONS=[];
-
-% the decoy should be in 2,4,left

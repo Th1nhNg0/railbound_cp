@@ -7,6 +7,7 @@ int: MAX_TIME;
 int: MAX_TRACKS; 
 tuple(int, int): TARGET;
 array[int] of tuple(int, int, Dir): TRAINS;    
+array[int] of tuple(int, int, Dir): DECOYS;    
 array[int] of tuple(int, int, Piece): INIT_POS;
 array[int] of tuple(int, int, Dir, int, int, Dir): TUNNEL_PAIRS;
 array[int] of tuple(int, int, int, bool): GATES;             
@@ -19,6 +20,7 @@ array[int] of tuple(int, int, int): STATIONS;
 % ============================================================
 
 int: N_TRAINS = length(TRAINS);
+int: N_DECOYS = length(DECOYS);
 int: N_INIT_POS = length(INIT_POS);  
 int: N_TUNNELS = length(TUNNEL_PAIRS);
 int: N_GATES = length(GATES);
@@ -36,6 +38,11 @@ array[1..H, 1..W] of var Piece: grid;
 array[1..N_TRAINS, 0..MAX_TIME] of var 1..H: train_row;
 array[1..N_TRAINS, 0..MAX_TIME] of var 1..W: train_col;
 array[1..N_TRAINS, 1..MAX_TIME] of var Dir: train_dir;
+
+array[1..N_DECOYS, 0..MAX_TIME] of var 1..H: decoy_row;
+array[1..N_DECOYS, 0..MAX_TIME] of var 1..W: decoy_col;
+array[1..N_DECOYS, 1..MAX_TIME] of var Dir: decoy_dir;
+
 array[1..N_TRAINS] of var N_TRAINS..MAX_TIME: arrival_time;
 % The state (true=open, false=closed) of each gate `g` at each timestep `i`.
 array[0..max(1, N_GATES), 0..MAX_TIME] of var bool: gate_open;
@@ -56,6 +63,7 @@ array[1..max(1, N_ESWITCHES), 0..MAX_TIME] of var bool: eswitch_toggled;
 
 include "constraints/grid.mzn";
 include "constraints/trains.mzn";
+include "constraints/decoys.mzn";
 include "constraints/gates.mzn";
 include "constraints/dswitches.mzn";
 include "constraints/eswitches.mzn";
