@@ -19,7 +19,7 @@
 #   ./run_benchmarks.sh [options]
 #
 # Example:
-#   # Run with the default CP-SAT solver on all levels
+#   # Run with the default Chuffed solver on all levels
 #   ./run_benchmarks.sh
 #
 #   # Run with Gecode on levels 1 and 3, with a 60s time limit

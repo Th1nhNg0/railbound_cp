@@ -27,7 +27,7 @@ This repository is a comprehensive resource for anyone interested in constraint 
 - **Tunnels**: Teleportation points allowing trains to move between distant locations
 - **Stations**: Designated stops where trains must wait before continuing to the target
 
-### Station Mechanics (New!)
+### Station Mechanics
 
 - **Station Assignment**: Each station is assigned to a specific train via `(row, col, train_id)` format
 - **Multiple Stations**: A train can have multiple stations assigned to it (same train_id)
