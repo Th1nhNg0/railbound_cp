@@ -7,6 +7,7 @@ MAX_TRACKS=9;
 TARGET=(5,6);
 
 TRAINS=[(5,3,LEFT),(3,4,TOP)];
+DECOYS=[];
 
 INIT_POS=[
 (3,2,ROCK),

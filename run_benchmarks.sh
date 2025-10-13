@@ -51,7 +51,7 @@ usage() {
     echo "Options:"
     echo "  -s SOLVER     MiniZinc solver to use (default: $SOLVER)"
     echo "  -t TIMELIMIT  Time limit in milliseconds (default: $TIME_LIMIT)"
-    echo "  -l LEVELS     Comma-separated list of level directories (e.g., \"1,3\") (default: all)"
+    echo "  -l LEVELS     Comma-separated list of level directories (e.g., \"1,3\" or \"all\") (default: all)"
     echo "  -o OUTPUTDIR  Output directory (default: $OUTPUT_DIR)"
     echo "  -m MODELFILE  Model file (default: $MODEL_FILE)"
     echo "  -p PARALLEL   Number of parallel threads (default: $PARALLEL)"
@@ -90,8 +90,8 @@ fi
 
 # --- Level Discovery ---
 # Determine which level directories to process.
-if [ -z "$LEVELS" ]; then
-    # If no levels are specified, find all directories in `data/`.
+if [ -z "$LEVELS" ] || [ "$LEVELS" = "all" ]; then
+    # If no levels are specified or "all" is specified, find all directories in `data/`.
     level_dirs=$(ls -d "$data_dir"/*/ 2>/dev/null | sort -V)
 else
     # If levels are specified, parse the comma-separated list.

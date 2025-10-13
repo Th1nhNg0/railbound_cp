@@ -58,17 +58,19 @@ output [
   | t in 1..N_TRAINS
 ]
 ++
-["\nDECOY PATHS:\n"]
-++
-[
-  "Decoy \(d):\n" ++
-  "  Path: " ++ show(
-    (
-      if fix(arrival_time[d]) > 0 then
-        [ (decoy_row[d, time], decoy_col[d, time]) | time in 1..fix(arrival_time[d]) ]
-      else []
-      endif
-    )
-  ) ++ "\n"
-  | d in 1..N_DECOYS
-]
+(if N_DECOYS > 0 then
+  ["\nDECOY PATHS:\n"]
+  ++
+  [
+    "Decoy \(d):\n" ++
+    "  Path: " ++ show(
+      (
+        if fix(arrival_time[d]) > 0 then
+          [ (decoy_row[d, time], decoy_col[d, time]) | time in 1..fix(arrival_time[d]) ]
+        else []
+        endif
+      )
+    ) ++ "\n"
+    | d in 1..N_DECOYS
+  ]
+else [] endif)
