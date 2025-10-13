@@ -33,7 +33,7 @@ constraint forall(t in 1..N_TRAINS) (
 
 % --- Train Movement Constraint ---
 % Defines how trains move from one cell to the next based on track pieces and gates.
-constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
+constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_time[t]) (
   let {
     var 1..H: r = train_row[t, time];
     var 1..W: c = train_col[t, time];
@@ -43,40 +43,16 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
     var 1..H: next_r = train_row[t, time+1];
     var 1..W: next_c = train_col[t, time+1];
     var Dir: next_entry_dir = train_dir[t, time+1];
-    var 1..H: intended_r;
-    var 1..W: intended_c;
-    var Dir: intended_entry_dir;
-    var bool: blocked_by_gate =
-      if cell_has_gate[intended_r, intended_c] then
-        not gate_open[gate_index_at[intended_r, intended_c], time+1]
-      else false endif;
-    var bool: is_dswitch = piece in DSWITCHES_SET;
-    var bool: is_eswitch = piece in ESWITCHES_SET;
-    var bool: dswitch_state =
-      if is_dswitch then
-        dswitch_toggled[dswitch_index_at[r, c], time]
-      else false endif;
-    var bool: eswitch_state =
-      if N_ESWITCHES > 0 /\ is_eswitch /\ cell_has_eswitch[r, c] then
-        eswitch_toggled[eswitch_index_at[r, c], time]
-      else false endif;
+    var bool: blocked_by_gate = cell_has_gate[next_r, next_c] /\ not gate_open[gate_index_at[next_r, next_c], time+1];
     var Piece: effective_piece = 
-      if is_dswitch then dswitch_effective_piece(piece, dswitch_state) 
-      elseif is_eswitch then eswitch_effective_piece(piece, eswitch_state)
+      if piece in DSWITCHES_SET then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
+      elseif piece in ESWITCHES_SET then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
       else piece endif;
   } in
-  % If the train has reached the target, it remains stationary.
-  if r == TARGET.1 /\ c == TARGET.2 then
-    (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
   % If the train is waiting at a station, it remains stationary.
-  elseif station_wait_time[t, time] > 0 then
+  if station_wait_time[t, time] > 0 \/ blocked_by_gate then
     (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
   else
-    % Verify that the train can enter the current piece from its entry direction.
-    can_enter[piece, entry_dir] /\
-    % Determine exit direction using the effective piece (which accounts for dswitch toggle state).
-    exit_dir = exit_of[effective_piece, entry_dir] /\
-    % Determine the intended next cell based on the exit direction or tunnel destination.
     (if piece in TUNNELS_SET then
        let {
          var tuple(int, int): dest = tunnel_dest[r, c];
@@ -85,30 +61,23 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1) (
          var int: dest_r = dest.1;
          var int: dest_c = dest.2;
        } in
-       intended_r = dest_r + dr[dest_exit_dir_enum] /\
-       intended_c = dest_c + dc[dest_exit_dir_enum] /\
-       intended_entry_dir = opposite[dest_exit_dir_enum]
+       next_r = dest_r + dr[dest_exit_dir_enum] /\
+       next_c = dest_c + dc[dest_exit_dir_enum] /\
+       next_entry_dir = opposite[dest_exit_dir_enum]
      else
-       intended_r = r + dr[exit_dir] /\
-       intended_c = c + dc[exit_dir] /\
-       intended_entry_dir = opposite[exit_dir] 
+       exit_dir = exit_of[effective_piece, entry_dir] /\
+       next_r = r + dr[exit_dir] /\
+       next_c = c + dc[exit_dir] /\
+       next_entry_dir = opposite[exit_dir]
      endif) /\
-    % The train must be able to enter the piece at the intended next cell.
-    can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
-    % If the path is blocked by a gate, the train waits; otherwise, it moves.
-    if blocked_by_gate then
-      (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
-    else
-      (next_r, next_c, next_entry_dir) = (intended_r, intended_c, intended_entry_dir)
-    endif
+    can_enter[grid[next_r, next_c], next_entry_dir] 
   endif
 );
 
 % --- Train Arrival Constraint ---
 % A train is considered arrived when it reaches the target and remains there for all subsequent timesteps.
-constraint forall(t in 1..N_TRAINS, time in 0..MAX_TIME) (
-    (train_row[t, time] = TARGET.1 /\ train_col[t, time] = TARGET.2)
-    <-> (time >= arrival_time[t])
+constraint forall(t in 1..N_TRAINS) (
+    (train_row[t, arrival_time[t]] = TARGET.1 /\ train_col[t, arrival_time[t]] = TARGET.2)
 );
 
 % --- Sequential Arrival Constraint ---
@@ -119,32 +88,26 @@ constraint forall(t in 1..N_TRAINS-1) (
 
 % --- No Collision Constraint ---
 % Ensures that no two trains occupy the same cell at the same time (before either arrives).
-constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME)(
-    (i < arrival_time[t1] /\ i < arrival_time[t2]) ->
+constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME where i < arrival_time[t1])(
     (train_row[t1, i] != train_row[t2, i] \/ train_col[t1, i] != train_col[t2, i])
 );
 
 % --- No Position Swap Constraint ---
 % Prevents trains from swapping positions in consecutive time steps (including through tunnels).
 % A more compact version of the "no-swapping" constraint.
-constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1)(
-    % The condition (antecedent) for the implication:
-    (i < arrival_time[t1] /\ i < arrival_time[t2])
-    -> % Implication: if the above is true, the following must hold:
-    (
-        let {
-            var 1..H: r1_i = train_row[t1, i],
-            var 1..W: c1_i = train_col[t1, i],
-            var 1..H: eff_r1 = if grid[r1_i, c1_i] in TUNNELS_SET then tunnel_dest[r1_i, c1_i].1 else r1_i endif,
-            var 1..W: eff_c1 = if grid[r1_i, c1_i] in TUNNELS_SET then tunnel_dest[r1_i, c1_i].2 else c1_i endif,
-            var 1..H: r2_i = train_row[t2, i],
-            var 1..W: c2_i = train_col[t2, i],
-            var 1..H: eff_r2 = if grid[r2_i, c2_i] in TUNNELS_SET then tunnel_dest[r2_i, c2_i].1 else r2_i endif,
-            var 1..W: eff_c2 = if grid[r2_i, c2_i] in TUNNELS_SET then tunnel_dest[r2_i, c2_i].2 else c2_i endif
+constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1 where i < arrival_time[t1])(
+    let {
+        var 1..H: r1_i = train_row[t1, i],
+        var 1..W: c1_i = train_col[t1, i],
+        var 1..H: eff_r1 = if grid[r1_i, c1_i] in TUNNELS_SET then tunnel_dest[r1_i, c1_i].1 else r1_i endif,
+        var 1..W: eff_c1 = if grid[r1_i, c1_i] in TUNNELS_SET then tunnel_dest[r1_i, c1_i].2 else c1_i endif,
+        var 1..H: r2_i = train_row[t2, i],
+        var 1..W: c2_i = train_col[t2, i],
+        var 1..H: eff_r2 = if grid[r2_i, c2_i] in TUNNELS_SET then tunnel_dest[r2_i, c2_i].1 else r2_i endif,
+        var 1..W: eff_c2 = if grid[r2_i, c2_i] in TUNNELS_SET then tunnel_dest[r2_i, c2_i].2 else c2_i endif
 
-        } in 
-        % The consequence: they cannot swap positions.
-        (eff_r1, eff_c1) != (train_row[t2, i+1], train_col[t2, i+1]) \/
-        (eff_r2, eff_c2) != (train_row[t1, i+1], train_col[t1, i+1])
-    )
+    } in 
+    % The consequence: they cannot swap positions.
+    (eff_r1, eff_c1) != (train_row[t2, i+1], train_col[t2, i+1]) \/
+    (eff_r2, eff_c2) != (train_row[t1, i+1], train_col[t1, i+1])
 );

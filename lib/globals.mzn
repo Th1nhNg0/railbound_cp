@@ -86,9 +86,6 @@ int: ESWITCH_INDEX_UPPER = if N_ESWITCHES = 0 then 1 else N_ESWITCHES endif;
 % Maps each cell (r,c) to the index of the exit-triggered switch at that location. Returns 1 for cells without exit-triggered switches.
 array[1..H, 1..W] of 1..ESWITCH_INDEX_UPPER: eswitch_index_at =
   array2d(1..H, 1..W, [ let { int: es_idx = if N_ESWITCHES = 0 then 0 else sum(es in 1..N_ESWITCHES where ESWITCHES_DERIVED[es].1 = r /\ ESWITCHES_DERIVED[es].2 = c)(es) endif; } in if es_idx > 0 then es_idx else 1 endif | r in 1..H, c in 1..W ]);
-% A boolean grid indicating if a cell contains an exit-triggered switch.
-array[1..H, 1..W] of bool: cell_has_eswitch =
-  array2d(1..H, 1..W, [ let { int: count = if N_ESWITCHES = 0 then 0 else sum(es in 1..N_ESWITCHES where ESWITCHES_DERIVED[es].1 = r /\ ESWITCHES_DERIVED[es].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
 
 % --- Station Metadata ---
 
