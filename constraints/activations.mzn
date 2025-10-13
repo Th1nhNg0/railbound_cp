@@ -1,10 +1,10 @@
 
 /******************************************************************************
- * Activations & Gates
+ * Activations, Gates, and DSwitches
  *
- * This file models the behavior of activation cells and the gates they
- * control. When a train enters an activation cell, it triggers a toggle
- * event for its linked gate.
+ * This file models the behavior of activation cells and the gates and
+ * dynamic switches (dswitches) they control. When a train enters an
+ * activation cell, it triggers a toggle event for its linked gate or dswitch.
  ******************************************************************************/
 
 % The highest ID used for any activation.
@@ -40,17 +40,17 @@ constraint forall(a in 1..MAX_ID, t in 2..MAX_TIME)(
 % Set the initial state of each gate based on the input data.
 constraint N_ACTIVATIONS > 0 /\ N_GATES > 0 -> forall(g in 1..N_GATES)(gate_open[g, 0] = GATES[g].4);
 
-
-
 constraint N_ACTIVATIONS >0 /\ N_DSWITCHES > 0 ->
     forall(ds in 1..N_DSWITCHES)(
         dswitch_toggled[ds, 0] = false
     );
 
 % Update gate states based on toggle events.
-constraint forall(g in 1..N_GATES, t in 1..MAX_TIME)(
-    gate_open[g, t] = if should_toggle[GATES[g].3, t] then not gate_open[g, t - 1] else gate_open[g, t - 1] endif
-);
-constraint forall(ds in 1..N_DSWITCHES, t in 1..MAX_TIME)(
-    dswitch_toggled[ds, t] = if should_toggle[DSWITCHES[ds].3, t] then not dswitch_toggled[ds, t - 1] else dswitch_toggled[ds, t - 1] endif
-);
+constraint N_GATES > 0 /\ N_ACTIVATIONS > 0 ->
+    forall(g in 1..N_GATES, t in 1..MAX_TIME)(
+        gate_open[g, t] = if should_toggle[GATES[g].3, t] then not gate_open[g, t - 1] else gate_open[g, t - 1] endif
+    );
+constraint N_DSWITCHES > 0 /\ N_ACTIVATIONS > 0 ->
+    forall(ds in 1..N_DSWITCHES, t in 1..MAX_TIME)(
+        dswitch_toggled[ds, t] = if should_toggle[DSWITCHES[ds].3, t] then not dswitch_toggled[ds, t - 1] else dswitch_toggled[ds, t - 1] endif
+    );
