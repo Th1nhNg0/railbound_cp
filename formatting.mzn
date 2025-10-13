@@ -24,7 +24,8 @@ any: solution_data :: output_only = (
     )
     | t in 1..N_TRAINS
   ]),
-  train_path_lengths: showJSON([ fix(arrival_time[t]) | t in 1..N_TRAINS ])
+  train_path_lengths: showJSON([ fix(arrival_time[t]) | t in 1..N_TRAINS ]),
+  should_toggle: showJSON(should_toggle)
 );
 output :: vis_server("viz.html", initial_data) solution_data;
 output [

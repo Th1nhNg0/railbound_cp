@@ -45,7 +45,7 @@ array[1..N_DECOYS, 1..MAX_TIME] of var Dir: decoy_dir;
 
 array[1..N_TRAINS] of var N_TRAINS..MAX_TIME: arrival_time;
 % The state (true=open, false=closed) of each gate `g` at each timestep `i`.
-array[0..max(1, N_GATES), 0..MAX_TIME] of var bool: gate_open;
+array[1..max(1, N_GATES), 0..MAX_TIME] of var bool: gate_open;
 % The state of each dynamic switch at each timestep.
 % A DSWITCH has two possible states representing its toggled configuration.
 % For example, DSWITCH_T_D_R can toggle to DSWITCH_D_T_R.
@@ -64,8 +64,7 @@ array[1..max(1, N_ESWITCHES), 0..MAX_TIME] of var bool: eswitch_toggled;
 include "constraints/grid.mzn";
 include "constraints/trains.mzn";
 include "constraints/decoys.mzn";
-include "constraints/gates.mzn";
-include "constraints/dswitches.mzn";
+include "constraints/activations.mzn";
 include "constraints/eswitches.mzn";
 include "constraints/stations.mzn";
 

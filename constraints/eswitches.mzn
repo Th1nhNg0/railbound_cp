@@ -33,9 +33,9 @@ constraint if N_ESWITCHES > 0 then
                 )
             );
             % Toggle occurs if an odd number of exits happened.
-            var bool: should_toggle = (num_exits mod 2) = 1;
+            var bool: should_be_toggle = (num_exits mod 2) = 1;
         } in
         % Exit-triggered switch state at time t is toggled from t-1 if should_toggle is true, otherwise unchanged.
-        eswitch_toggled[es, t] = if should_toggle then not eswitch_toggled[es, t - 1] else eswitch_toggled[es, t - 1] endif
+        eswitch_toggled[es, t] = if should_be_toggle then not eswitch_toggled[es, t - 1] else eswitch_toggled[es, t - 1] endif
     )
 else true endif;

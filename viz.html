@@ -168,6 +168,16 @@
 
         const DIR_STRING_TO_NUM = { TOP: 1, RIGHT: 2, DOWN: 3, LEFT: 4 };
         const DIR_NUM_TO_STRING = { 1: "TOP", 2: "RIGHT", 3: "DOWN", 4: "LEFT" };
+        const DSWITCH_TOGGLE_MAP = {
+          DSWITCH_T_D_R: "DSWITCH_D_T_R",
+          DSWITCH_T_D_L: "DSWITCH_D_T_L",
+          DSWITCH_D_T_R: "DSWITCH_T_D_R",
+          DSWITCH_D_T_L: "DSWITCH_T_D_L",
+          DSWITCH_R_L_T: "DSWITCH_L_R_T",
+          DSWITCH_R_L_D: "DSWITCH_L_R_D",
+          DSWITCH_L_R_T: "DSWITCH_R_L_T",
+          DSWITCH_L_R_D: "DSWITCH_R_L_D",
+        };
 
         function resolveDirectionValue(direction) {
           if (direction == null) {
@@ -269,9 +279,60 @@
         let currentGridData = null;
         let trainPaths = [];
         let trainPathLengths = [];
+        let gateOpenStates = [];
+        let dswitchToggledStates = [];
+        let shouldToggle = [];
         let currentTimeStep = 0;
         let maxTimeStep = 0;
         let timeSliderInUpdate = false;
+
+        function computeGateStates() {
+          if (!gates || !shouldToggle) {
+            gateOpenStates = [];
+            return;
+          }
+
+          const computedStates = [];
+          for (let g_idx = 0; g_idx < gates.length; g_idx++) {
+            const gate = gates[g_idx];
+            const [, , activation_id, initially_open] = gate;
+
+            const gateStatesForT = [];
+            gateStatesForT[0] = initially_open;
+
+            for (let t = 1; t <= maxTimeStep; t++) {
+              const toggle = shouldToggle[activation_id - 1]?.[t] ?? false;
+              const previousState = gateStatesForT[t - 1];
+              gateStatesForT[t] = toggle ? !previousState : previousState;
+            }
+            computedStates[g_idx] = gateStatesForT;
+          }
+          gateOpenStates = computedStates;
+        }
+
+        function computeDSwitchStates() {
+          if (!dswitches || !shouldToggle) {
+            dswitchToggledStates = [];
+            return;
+          }
+
+          const computedStates = [];
+          for (let ds_idx = 0; ds_idx < dswitches.length; ds_idx++) {
+            const dswitch = dswitches[ds_idx];
+            const [, , activation_id] = dswitch;
+
+            const dswitchStatesForT = [];
+            dswitchStatesForT[0] = false; // Initial state is not toggled
+
+            for (let t = 1; t <= maxTimeStep; t++) {
+              const toggle = shouldToggle[activation_id - 1]?.[t] ?? false;
+              const previousState = dswitchStatesForT[t - 1];
+              dswitchStatesForT[t] = toggle ? !previousState : previousState;
+            }
+            computedStates[ds_idx] = dswitchStatesForT;
+          }
+          dswitchToggledStates = computedStates;
+        }
 
         function safeParseJSON(value, fallback) {
           if (typeof value !== "string") {
@@ -401,9 +462,27 @@
                 // (keep the original piece visible)
                 if (initPos) {
                   const [, , track] = initPos;
+                  let pieceToDraw = track;
+
+                  const dswitchIndex = dswitches?.findIndex(
+                    ([r, c]) => r === row + 1 && c === col + 1
+                  );
+                  if (dswitchIndex !== -1) {
+                    const isToggled =
+                      dswitchToggledStates[dswitchIndex]?.[currentTimeStep] ??
+                      false;
+                    if (isToggled) {
+                      const toggledPieceName =
+                        DSWITCH_TOGGLE_MAP[pieceToDraw.e];
+                      if (toggledPieceName) {
+                        pieceToDraw = { e: toggledPieceName };
+                      }
+                    }
+                  }
+
                   const img = document.createElement("img");
-                  img.src = `images/${track.e}.svg`;
-                  img.alt = track.e;
+                  img.src = `images/${pieceToDraw.e}.svg`;
+                  img.alt = pieceToDraw.e;
                   cell.appendChild(img);
                 } else if (tunnel) {
                   const [r_A, c_A, dir_A, r_B, c_B, dir_B] = tunnel;
@@ -442,9 +521,25 @@
                   }
                 } else if (piece.e !== "EMPTY") {
                   // Only draw solution piece if not init or tunnel
+                  let pieceToDraw = piece;
+                  const dswitchIndex = dswitches?.findIndex(
+                    ([r, c]) => r === row + 1 && c === col + 1
+                  );
+                  if (dswitchIndex !== -1) {
+                    const isToggled =
+                      dswitchToggledStates[dswitchIndex]?.[currentTimeStep] ??
+                      false;
+                    if (isToggled) {
+                      const toggledPieceName =
+                        DSWITCH_TOGGLE_MAP[pieceToDraw.e];
+                      if (toggledPieceName) {
+                        pieceToDraw = { e: toggledPieceName };
+                      }
+                    }
+                  }
                   const img = document.createElement("img");
-                  img.src = `images/${piece.e}.svg`;
-                  img.alt = piece.e;
+                  img.src = `images/${pieceToDraw.e}.svg`;
+                  img.alt = pieceToDraw.e;
                   cell.appendChild(img);
                 }
               } else {
@@ -513,18 +608,29 @@
               }
 
               // Add gates
-              const gate = gates?.find(
+              const gateIndex = gates?.findIndex(
                 ([r, c]) => r === row + 1 && c === col + 1
               );
-              if (gate) {
-                const [, , gate_id, initially_open] = gate;
+              if (gateIndex !== -1) {
+                const gate = gates[gateIndex];
+                const gate_id = gateIndex + 1;
+                const [, , activation_id, initially_open] = gate;
                 const gateDiv = document.createElement("div");
+
+                let isOpen = initially_open;
+                if (
+                  gateOpenStates?.[gateIndex] &&
+                  currentTimeStep < gateOpenStates[gateIndex].length
+                ) {
+                  isOpen = gateOpenStates[gateIndex][currentTimeStep];
+                }
+
                 gateDiv.className = `gate-indicator ${
-                  initially_open ? "gate-open" : "gate-closed"
+                  isOpen ? "gate-open" : "gate-closed"
                 }`;
-                gateDiv.textContent = gate_id;
+                gateDiv.textContent = activation_id;
                 gateDiv.title = `Gate ${gate_id}: ${
-                  initially_open ? "Open" : "Closed"
+                  isOpen ? "Open" : "Closed"
                 }`;
                 cell.appendChild(gateDiv);
               }
@@ -534,11 +640,11 @@
                 ([r, c]) => r === row + 1 && c === col + 1
               );
               if (activation) {
-                const [, , gate_id] = activation;
+                const [, , activation_id] = activation;
                 const activationDiv = document.createElement("div");
                 activationDiv.className = "activation-indicator";
-                activationDiv.textContent = gate_id;
-                activationDiv.title = `Activation for Gate/DSwitch ${gate_id}`;
+                activationDiv.textContent = activation_id;
+                activationDiv.title = `Activation for Gate/DSwitch ${activation_id}`;
                 cell.appendChild(activationDiv);
               }
 
@@ -627,6 +733,7 @@
           }
 
           currentGridData = safeParseJSON(data?.grid, null);
+          shouldToggle = safeParseJSON(data?.should_toggle, []);
 
           const rawTrainPaths = safeParseJSON(data?.train_paths, []);
           const rawPathLengths = safeParseJSON(
@@ -687,6 +794,9 @@
           );
 
           maxTimeStep = Number.isFinite(bestMaxTime) ? bestMaxTime : 0;
+
+          computeGateStates();
+          computeDSwitchStates();
 
           if (maxTimeStep > 0 || initialTrainPositions.length > 0) {
             timelineControls.style.display = "block";
