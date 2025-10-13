@@ -53,7 +53,7 @@ predicate in_bounds(int: r, int: c) =
 % Ensures that switches have exactly 3 valid connecting neighbors.
 constraint forall(r in 1..H, c in 1..W)(
   % If this cell has a switch that's not pre-placed
-  ((grid[r, c] in SWITCHES_SET \/ grid[r, c] in DSWITCHES_SET \/ grid[r, c] in ESWITCHES_SET) /\
+  ((grid[r, c] in SWITCHES_SET) /\
   not cell_is_init[r, c])
   ->
   % Then the number of directions that have valid connecting neighbors is 3

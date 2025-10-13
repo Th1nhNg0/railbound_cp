@@ -19,6 +19,7 @@ constraint forall(t in 1..N_TRAINS) (
   } in
   train_row[t, 0] = r0 /\
   train_col[t, 0] = c0 /\
+  can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
   if blocked_by_gate then
     train_row[t, 1] = r0 /\
     train_col[t, 1] = c0 /\
@@ -43,14 +44,20 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
     var 1..H: next_r = train_row[t, time+1];
     var 1..W: next_c = train_col[t, time+1];
     var Dir: next_entry_dir = train_dir[t, time+1];
-    var bool: blocked_by_gate = cell_has_gate[next_r, next_c] /\ not gate_open[gate_index_at[next_r, next_c], time+1];
+    var 1..H: intended_r;
+    var 1..W: intended_c;
+    var Dir: intended_entry_dir;
+    var bool: blocked_by_gate = if cell_has_gate[intended_r, intended_c] then
+        not gate_open[gate_index_at[intended_r, intended_c], time+1]
+      else false endif;
     var Piece: effective_piece = 
       if piece in DSWITCHES_SET then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
       elseif piece in ESWITCHES_SET then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
       else piece endif;
   } in
+
   % If the train is waiting at a station, it remains stationary.
-  if station_wait_time[t, time] > 0 \/ blocked_by_gate then
+  if station_wait_time[t, time] > 0 then
     (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
   else
     (if piece in TUNNELS_SET then
@@ -61,16 +68,21 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
          var int: dest_r = dest.1;
          var int: dest_c = dest.2;
        } in
-       next_r = dest_r + dr[dest_exit_dir_enum] /\
-       next_c = dest_c + dc[dest_exit_dir_enum] /\
-       next_entry_dir = opposite[dest_exit_dir_enum]
+       intended_r = dest_r + dr[dest_exit_dir_enum] /\
+       intended_c = dest_c + dc[dest_exit_dir_enum] /\
+       intended_entry_dir = opposite[dest_exit_dir_enum]
      else
        exit_dir = exit_of[effective_piece, entry_dir] /\
-       next_r = r + dr[exit_dir] /\
-       next_c = c + dc[exit_dir] /\
-       next_entry_dir = opposite[exit_dir]
+       intended_r = r + dr[exit_dir] /\
+       intended_c = c + dc[exit_dir] /\
+       intended_entry_dir = opposite[exit_dir]
      endif) /\
-    can_enter[grid[next_r, next_c], next_entry_dir] 
+    can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
+    if blocked_by_gate then
+      (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
+    else
+      (next_r, next_c, next_entry_dir) = (intended_r, intended_c, intended_entry_dir)
+    endif  
   endif
 );
 
