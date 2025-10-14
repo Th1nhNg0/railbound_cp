@@ -106,20 +106,12 @@ constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME wh
 
 % --- No Position Swap Constraint ---
 % Prevents trains from swapping positions in consecutive time steps (including through tunnels).
-% A more compact version of the "no-swapping" constraint.
 constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1 where i < arrival_time[t1])(
     let {
-        var 1..H: r1_i = train_row[t1, i],
-        var 1..W: c1_i = train_col[t1, i],
-        var 1..H: eff_r1 = if grid[r1_i, c1_i] in TUNNELS_SET then tunnel_dest[r1_i, c1_i].1 else r1_i endif,
-        var 1..W: eff_c1 = if grid[r1_i, c1_i] in TUNNELS_SET then tunnel_dest[r1_i, c1_i].2 else c1_i endif,
-        var 1..H: r2_i = train_row[t2, i],
-        var 1..W: c2_i = train_col[t2, i],
-        var 1..H: eff_r2 = if grid[r2_i, c2_i] in TUNNELS_SET then tunnel_dest[r2_i, c2_i].1 else r2_i endif,
-        var 1..W: eff_c2 = if grid[r2_i, c2_i] in TUNNELS_SET then tunnel_dest[r2_i, c2_i].2 else c2_i endif
-
+        var tuple(int, int): eff_pos1 = get_effective_pos(train_row[t1, i], train_col[t1, i]),
+        var tuple(int, int): eff_pos2 = get_effective_pos(train_row[t2, i], train_col[t2, i])
     } in 
-    % The consequence: they cannot swap positions.
-    (eff_r1, eff_c1) != (train_row[t2, i+1], train_col[t2, i+1]) \/
-    (eff_r2, eff_c2) != (train_row[t1, i+1], train_col[t1, i+1])
+    % They cannot swap positions
+    eff_pos1 != (train_row[t2, i+1], train_col[t2, i+1]) \/
+    eff_pos2 != (train_row[t1, i+1], train_col[t1, i+1])
 );

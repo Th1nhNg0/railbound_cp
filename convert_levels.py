@@ -34,18 +34,18 @@ from typing import Dict, Any, Tuple, List
 # Based on the enums in the original solver's `classes.ts` and reverse-engineered
 # from existing `.dzn` files.
 BOARD_TO_TRACK: Dict[int, str | None] = {
-    0: None,  # EMPTY - Not placed initially, solver determines this.
+    0: None,  # ROCK - Not placed initially, solver determines this.
     1: "STRAIGHT_RL",  # HORIZONTAL_TRACK
     2: "STRAIGHT_TD",  # VERTICAL_TRACK
     3: "STRAIGHT_RL",  # CAR_ENDING_TRACK_RIGHT - The target cell.
-    4: "EMPTY",  # ROADBLOCK - Explicitly an empty, impassable cell.
+    4: "ROCK",  # ROADBLOCK - Explicitly an empty, impassable cell.
     5: "CORNER_DR",  # BOTTOM_RIGHT_TURN
     6: "CORNER_DL",  # BOTTOM_LEFT_TURN
     7: "CORNER_TR",  # TOP_RIGHT_TURN
     8: "CORNER_TL",  # TOP_LEFT_TURN
-    9: "SWITCH_R_L_D",  # BOTTOM_RIGHT_LEFT_3WAY
+    9: "SWITCH_L_R_D",  # BOTTOM_RIGHT_LEFT_3WAY
     10: "SWITCH_T_D_R",  # BOTTOM_RIGHT_TOP_3WAY
-    11: "SWITCH_R_L_D",  # BOTTOM_LEFT_RIGHT_3WAY
+    11: "SWITCH_L_R_D",  # BOTTOM_LEFT_RIGHT_3WAY
     12: "SWITCH_T_D_L",  # BOTTOM_LEFT_TOP_3WAY
     13: "SWITCH_L_R_T",  # TOP_RIGHT_LEFT_3WAY
     14: "SWITCH_D_T_R",  # TOP_RIGHT_BOTTOM_3WAY
@@ -60,10 +60,10 @@ BOARD_TO_TRACK: Dict[int, str | None] = {
     29: "STRAIGHT_RL",  # CAR_ENDING_TRACK_LEFT
     30: "STRAIGHT_TD",  # CAR_ENDING_TRACK_DOWN
     31: "STRAIGHT_TD",  # CAR_ENDING_TRACK_UP
-    34: "EMPTY",  # STATION_EMPTY - Empty space near a station.
-    35: "EMPTY",  # ANOTHER_STATION_EMPTY
-    36: "EMPTY",  # ANOTHER_STATION_EMPTY
-    37: "EMPTY",  # ANOTHER_STATION_EMPTY
+    34: "ROCK",  # STATION_ROCK - Empty space near a station.
+    35: "ROCK",  # ANOTHER_STATION_ROCK
+    36: "ROCK",  # ANOTHER_STATION_ROCK
+    37: "ROCK",  # ANOTHER_STATION_ROCK
 }
 
 # Mapping from old `mods` integer values to their semantic meaning.
@@ -132,13 +132,18 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
     if not target:
         raise ValueError(f"No target found for level {level_name}")
 
-    # --- Collect Train Information ---
+    # --- Collect Train and Decoy Information ---
     trains: List[Tuple[int, int, str]] = []
+    decoys: List[Tuple[int, int, str]] = []
     for car in cars:
         if car["type"] == "NORMAL":
             r, c = car["pos"]
             direction = DIRECTION_MAP[car["direction"]]
             trains.append((r + 1, c + 1, direction))  # 1-based indexing
+        elif car["type"] == "DECOY":
+            r, c = car["pos"]
+            direction = DIRECTION_MAP[car["direction"]]
+            decoys.append((r + 1, c + 1, direction))  # 1-based indexing
 
     # --- Process Grid for Initial Pieces and Switches ---
     init_pos: List[Tuple[int, int, str]] = []
@@ -219,11 +224,10 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
 
     # --- Assemble .dzn Content ---
     lines = [
-        f"% Auto-generated from levels.json for level: {level_name}",
         f"W={W};",
         f"H={H};",
         "",
-        "MAX_TIME=W*H; % A reasonable upper bound for timesteps",
+        "MAX_TIME=W*H;",
         f"MAX_TRACKS={tracks};",
         "",
         f"TARGET=({target[0]},{target[1]});",
@@ -236,6 +240,13 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
         lines.append(f"TRAINS=[{trains_str}];")
     else:
         lines.append("TRAINS=[];")
+
+    # Format decoys
+    if decoys:
+        decoys_str = ",".join([f"({r},{c},{d})" for r, c, d in decoys])
+        lines.append(f"DECOYS=[{decoys_str}];")
+    else:
+        lines.append("DECOYS=[];")
 
     lines.append("")
 
@@ -322,60 +333,73 @@ Examples:
         default="data",
         help="Directory to save the output .dzn files.",
     )
+    parser.add_argument(
+        "--level-prefix",
+        type=str,
+        help="Only convert levels with names starting with this prefix (e.g., '6-', '7-1').",
+    )
     args = parser.parse_args()
 
     # Load levels.json
-    json_path = Path("D:/Code/RailboundSolver/levels.json")
-    output_dir = Path("data/7")
+    if not args.json_path.exists():
+        print(
+            f"Error: Input JSON file not found at '{args.json_path}'", file=sys.stderr
+        )
+        sys.exit(1)
 
     with open(args.json_path, "r") as f:
         levels = json.load(f)
 
-    # Filter to only level 6
-    def is_world_6(level_name: str) -> bool:
-        # Level names like "6-1", "6-2", "6-3"
-        # Skip levels starting with #, or worlds other than 6
-        if level_name.startswith("#"):
-            return False
-        world = level_name.split("-")[0]
-        try:
-            return int(world) == 7
-        except ValueError:
-            return False
+    if args.level_prefix:
+        print(
+            f"{'Force converting' if args.force else 'Converting missing'} levels with prefix '{args.level_prefix}'..."
+        )
+    else:
+        print(
+            f"{'Force converting' if args.force else 'Converting missing'} all levels..."
+        )
 
-    print(
-        f"{'Force converting' if args.force else 'Converting missing'} world 6 levels..."
-    )
     converted = 0
-    skipped = 0
+    skipped_prefix = 0
     skipped_existing = 0
 
+    base_output_dir = args.output_dir
+
     for level_name, level_data in sorted(levels.items()):
-        if not is_world_6(level_name):
-            skipped += 1
+        if level_name.startswith("#"):
+            # These are comments or disabled levels in the source JSON
             continue
 
-        output_path = output_dir / f"{level_name}.dzn"
-
-        # Skip if file exists and not forcing
-        if not args.force and output_path.exists():
-            skipped_existing += 1
+        if args.level_prefix and not level_name.startswith(args.level_prefix):
+            skipped_prefix += 1
             continue
 
         try:
+            world = level_name.split("-")[0]
+            output_dir = base_output_dir / world
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            output_path = output_dir / f"{level_name}.dzn"
+
+            # Skip if file exists and not forcing
+            if not args.force and output_path.exists():
+                skipped_existing += 1
+                continue
+
             dzn_content = convert_level(level_name, level_data)
             output_path.write_text(dzn_content)
             converted += 1
-            if converted % 10 == 0:
+            if converted > 0 and converted % 10 == 0:
                 print(f"  Converted {converted} levels...")
         except Exception as e:
             print(f"Error converting {level_name}: {e}", file=sys.stderr)
 
     print("\nConversion complete!")
-    print(f"  Converted: {converted} levels from world 6")
+    print(f"  Converted: {converted} levels")
     if not args.force and skipped_existing > 0:
         print(f"  Skipped (already exist): {skipped_existing} levels")
-    print(f"  Skipped (other worlds): {skipped} levels")
+    if skipped_prefix > 0:
+        print(f"  Skipped (prefix mismatch): {skipped_prefix} levels")
 
 
 if __name__ == "__main__":

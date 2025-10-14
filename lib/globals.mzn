@@ -325,3 +325,9 @@ function var Piece: dswitch_effective_piece(var Piece: base_piece, var bool: tog
 % Function to get the effective piece type for an ESWITCH based on its toggle state.
 function var Piece: eswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
   if toggled then eswitch_toggle[base_piece] else base_piece endif;
+
+% --- Position Utilities ---
+
+% Helper function to get effective position (considering tunnels)
+function var tuple(int, int): get_effective_pos(var int: r, var int: c) = 
+    if grid[r, c] in TUNNELS_SET then tunnel_dest[r, c] else (r, c) endif;

@@ -23,18 +23,27 @@ constraint forall(a in 1..MAX_ID)(
 
 % Determine if a toggle should occur at each time step.
 constraint forall(a in 1..MAX_ID, t in 2..MAX_TIME)(
-    should_toggle[a, t] = (sum(
-        act in 1..N_ACTIVATIONS, tr in 1..N_TRAINS
-        where ACTIVATIONS[act].3 = a /\ arrival_time[tr] >= t
+    should_toggle[a, t] = ((sum(
+        act in 1..N_ACTIVATIONS where ACTIVATIONS[act].3 = a
     )(
-        bool2int(
-            % Train is at activation cell at time t-1
-            train_row[tr, t - 1] = ACTIVATIONS[act].1 /\
-            train_col[tr, t - 1] = ACTIVATIONS[act].2 /\
-            % Train was NOT at this cell at time t-2 (newly entered)
-            (train_row[tr, t - 2] != ACTIVATIONS[act].1 \/ train_col[tr, t - 2] != ACTIVATIONS[act].2)
+        sum(tr in 1..N_TRAINS where arrival_time[tr] >= t)(
+            bool2int(
+                % Train is at activation cell at time t-1
+                train_row[tr, t - 1] = ACTIVATIONS[act].1 /\
+                train_col[tr, t - 1] = ACTIVATIONS[act].2 /\
+                % Train was NOT at this cell at time t-2 (newly entered)
+                (train_row[tr, t - 2] != ACTIVATIONS[act].1 \/ train_col[tr, t - 2] != ACTIVATIONS[act].2)
+            )
+        ) + sum(d in 1..N_DECOYS)(
+            bool2int(
+                % Decoy is at activation cell at time t-1
+                decoy_row[d, t - 1] = ACTIVATIONS[act].1 /\
+                decoy_col[d, t - 1] = ACTIVATIONS[act].2 /\
+                % Decoy was NOT at this cell at time t-2 (newly entered)
+                (decoy_row[d, t - 2] != ACTIVATIONS[act].1 \/ decoy_col[d, t - 2] != ACTIVATIONS[act].2)
+            )
         )
-    ) mod 2 = 1)
+    )) mod 2 = 1)
 );
 
 % Set the initial state of each gate based on the input data.

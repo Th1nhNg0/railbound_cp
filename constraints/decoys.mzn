@@ -86,6 +86,29 @@ constraint forall(t1 in 1..N_DECOYS, t2 in t1 + 1..N_DECOYS, i in 1..MAX_TIME)(
     (decoy_row[t1, i] != decoy_row[t2, i] \/ decoy_col[t1, i] != decoy_col[t2, i])
 );
 
-constraint forall(t1 in 1..N_DECOYS, t2 in 1..N_TRAINS, i in 1..MAX_TIME)(
-    (decoy_row[t1, i] != train_row[t2, i] \/ decoy_col[t1, i] != train_col[t2, i])
+constraint forall(d in 1..N_DECOYS, t in 1..N_TRAINS, i in 1..MAX_TIME where i<=arrival_time[t])(
+    (decoy_row[d, i] != train_row[t, i] \/ decoy_col[d, i] != train_col[t, i])
+);
+% --- No Position Swap Constraint ---
+% Prevents entities from swapping positions in consecutive time steps (including through tunnels).
+% Decoy-Decoy position swap prevention
+constraint forall(d1 in 1..N_DECOYS, d2 in d1 + 1..N_DECOYS, i in 1..MAX_TIME-1)(
+    let {
+        var tuple(int, int): eff_pos1 = get_effective_pos(decoy_row[d1, i], decoy_col[d1, i]),
+        var tuple(int, int): eff_pos2 = get_effective_pos(decoy_row[d2, i], decoy_col[d2, i])
+    } in 
+    % They cannot swap positions
+    eff_pos1 != (decoy_row[d2, i+1], decoy_col[d2, i+1]) \/
+    eff_pos2 != (decoy_row[d1, i+1], decoy_col[d1, i+1])
+);
+
+% Decoy-Train position swap prevention
+constraint forall(d1 in 1..N_DECOYS, d2 in 1..N_TRAINS, i in 1..MAX_TIME-1 where i <= arrival_time[d2])(
+    let {
+        var tuple(int, int): eff_pos1 = get_effective_pos(decoy_row[d1, i], decoy_col[d1, i]),
+        var tuple(int, int): eff_pos2 = get_effective_pos(train_row[d2, i], train_col[d2, i])
+    } in 
+    % They cannot swap positions
+    eff_pos1 != (train_row[d2, i+1], train_col[d2, i+1]) \/
+    eff_pos2 != (decoy_row[d1, i+1], decoy_col[d1, i+1])
 );

@@ -21,8 +21,8 @@ else true endif;
 constraint if N_ESWITCHES > 0 then
     forall(es in 1..N_ESWITCHES, t in 1..MAX_TIME)(
         let {
-            % Count the number of trains that exited from this eswitch cell in the previous timestep.
-            % A train exits when it was at the eswitch cell at time t-1 but is somewhere else at time t.
+            % Count the number of trains and decoys that exited from this eswitch cell in the previous timestep.
+            % A train/decoy exits when it was at the eswitch cell at time t-1 but is somewhere else at time t.
             var int: num_exits = sum(tr in 1..N_TRAINS)(
                 bool2int(
                     % Train was at eswitch cell at time t-1
@@ -30,6 +30,14 @@ constraint if N_ESWITCHES > 0 then
                     train_col[tr, t - 1] = ESWITCHES_DERIVED[es].2 /\
                     % Train is NOT at this cell at time t (has exited)
                     (train_row[tr, t] != ESWITCHES_DERIVED[es].1 \/ train_col[tr, t] != ESWITCHES_DERIVED[es].2)
+                )
+            ) + sum(d in 1..N_DECOYS)(
+                bool2int(
+                    % Decoy was at eswitch cell at time t-1
+                    decoy_row[d, t - 1] = ESWITCHES_DERIVED[es].1 /\
+                    decoy_col[d, t - 1] = ESWITCHES_DERIVED[es].2 /\
+                    % Decoy is NOT at this cell at time t (has exited)
+                    (decoy_row[d, t] != ESWITCHES_DERIVED[es].1 \/ decoy_col[d, t] != ESWITCHES_DERIVED[es].2)
                 )
             );
             % Toggle occurs if an odd number of exits happened.

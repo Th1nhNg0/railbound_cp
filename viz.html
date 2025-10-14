@@ -153,6 +153,7 @@
           grid_width,
           init_positions,
           trains,
+          decoys,
           target,
           tunnels,
           gates,
@@ -178,6 +179,21 @@
           DSWITCH_L_R_T: "DSWITCH_R_L_T",
           DSWITCH_L_R_D: "DSWITCH_R_L_D",
         };
+
+        const ESWITCH_TOGGLE_MAP = {
+          ESWITCH_T_D_R: "ESWITCH_D_T_R",
+          ESWITCH_D_T_R: "ESWITCH_T_D_R",
+          ESWITCH_T_D_L: "ESWITCH_D_T_L",
+          ESWITCH_D_T_L: "ESWITCH_T_D_L",
+          ESWITCH_R_L_T: "ESWITCH_L_R_T",
+          ESWITCH_L_R_T: "ESWITCH_R_L_T",
+          ESWITCH_R_L_D: "ESWITCH_L_R_D",
+          ESWITCH_L_R_D: "ESWITCH_R_L_D",
+        };
+
+        const eswitches = (init_positions ?? [])
+          .map((pos, index) => ({ ...pos, originalIndex: index }))
+          .filter((pos) => pos[2].e.startsWith("ESWITCH"));
 
         function resolveDirectionValue(direction) {
           if (direction == null) {
@@ -274,13 +290,25 @@
           col: train?.[1],
           direction: resolveDirectionValue(train?.[2]),
           idx,
+          isDecoy: false,
+        }));
+
+        const initialDecoyPositions = (decoys ?? []).map((decoy, idx) => ({
+          row: decoy?.[0],
+          col: decoy?.[1],
+          direction: resolveDirectionValue(decoy?.[2]),
+          idx,
+          isDecoy: true,
         }));
 
         let currentGridData = null;
         let trainPaths = [];
         let trainPathLengths = [];
+        let decoyPaths = [];
+        let decoyPathLengths = [];
         let gateOpenStates = [];
         let dswitchToggledStates = [];
+        let eswitchToggledStates = [];
         let shouldToggle = [];
         let currentTimeStep = 0;
         let maxTimeStep = 0;
@@ -401,7 +429,7 @@
         // Draw grid
         function drawGrid(
           gridData = null,
-          activeTrains = initialTrainPositions
+          activeMovingObjects = [...initialTrainPositions, ...initialDecoyPositions]
         ) {
           container.innerHTML = "";
           container.style.gridTemplateColumns = `repeat(${grid_width}, 80px)`;
@@ -474,6 +502,23 @@
                     if (isToggled) {
                       const toggledPieceName =
                         DSWITCH_TOGGLE_MAP[pieceToDraw.e];
+                      if (toggledPieceName) {
+                        pieceToDraw = { e: toggledPieceName };
+                      }
+                    }
+                  }
+
+                  const eswitchIndex = eswitches?.findIndex(
+                    (eswitch) => eswitch[0] === row + 1 && eswitch[1] === col + 1
+                  );
+
+                  if (eswitchIndex !== -1) {
+                    const isToggled =
+                      eswitchToggledStates[eswitchIndex]?.[currentTimeStep] ??
+                      false;
+                    if (isToggled) {
+                      const toggledPieceName =
+                        ESWITCH_TOGGLE_MAP[pieceToDraw.e];
                       if (toggledPieceName) {
                         pieceToDraw = { e: toggledPieceName };
                       }
@@ -591,17 +636,21 @@
                 }
               }
 
-              // Add trains
-              const train = activeTrains?.find(
-                (t) => t?.row === row + 1 && t?.col === col + 1
+              // Add trains and decoys
+              const movingObject = activeMovingObjects?.find(
+                (o) => o?.row === row + 1 && o?.col === col + 1
               );
-              if (train) {
-                const rotation = getRotation(train.direction, true);
-
+              if (movingObject) {
+                const rotation = getRotation(movingObject.direction, true);
                 const img = document.createElement("img");
-                const carIndex = (train.idx ?? 0) + 1;
-                img.src = `images/Car ${carIndex}.svg`;
-                img.alt = `Car ${carIndex}`;
+                if (movingObject.isDecoy) {
+                  img.src = `images/Decoy.svg`;
+                  img.alt = `Decoy`;
+                } else {
+                  const carIndex = (movingObject.idx ?? 0) + 1;
+                  img.src = `images/Car ${carIndex}.svg`;
+                  img.alt = `Car ${carIndex}`;
+                }
                 img.style.transform = `rotate(${rotation}deg)`;
                 img.style.zIndex = "10";
                 cell.appendChild(img);
@@ -679,17 +728,17 @@
           }
         }
 
-        function getTrainPositionsAtTime(timeStep) {
+        function getPositionsAtTime(timeStep, paths, initialPositions) {
           if (
             typeof timeStep !== "number" ||
             Number.isNaN(timeStep) ||
             timeStep < 0
           ) {
-            return initialTrainPositions;
+            return initialPositions;
           }
 
           if (timeStep === 0) {
-            return initialTrainPositions;
+            return initialPositions;
           }
 
           const desiredStep = Math.min(
@@ -697,26 +746,26 @@
             maxTimeStep
           );
 
-          if (!Array.isArray(trainPaths) || trainPaths.length === 0) {
-            return initialTrainPositions;
+          if (!Array.isArray(paths) || paths.length === 0) {
+            return initialPositions;
           }
 
-          const trainCount = Math.max(
-            trainPaths.length,
-            initialTrainPositions.length
+          const count = Math.max(
+            paths.length,
+            initialPositions.length
           );
 
           const positions = [];
 
-          for (let idx = 0; idx < trainCount; idx++) {
-            const path = trainPaths[idx];
+          for (let idx = 0; idx < count; idx++) {
+            const path = paths[idx];
             if (Array.isArray(path) && path.length > 0) {
               const stepIndex = Math.min(desiredStep - 1, path.length - 1);
               positions.push(
-                path[stepIndex] || initialTrainPositions[idx] || null
+                path[stepIndex] || initialPositions[idx] || null
               );
-            } else if (initialTrainPositions[idx]) {
-              positions.push(initialTrainPositions[idx]);
+            } else if (initialPositions[idx]) {
+              positions.push(initialPositions[idx]);
             }
           }
 
@@ -725,7 +774,7 @@
 
         // Wait for tunnel SVG to load before drawing initial grid
         await tunnelSvgPromise;
-        drawGrid(null, initialTrainPositions);
+        drawGrid(null, [...initialTrainPositions, ...initialDecoyPositions]);
 
         function setSolution(data) {
           if (!data) {
@@ -734,6 +783,8 @@
 
           currentGridData = safeParseJSON(data?.grid, null);
           shouldToggle = safeParseJSON(data?.should_toggle, []);
+          const max_arrival_time = safeParseJSON(data?.max_arrival_time, 0);
+          eswitchToggledStates = safeParseJSON(data?.eswitch_toggled, []);
 
           const rawTrainPaths = safeParseJSON(data?.train_paths, []);
           const rawPathLengths = safeParseJSON(
@@ -774,31 +825,61 @@
                 return computedSteps.map((step) => ({
                   ...step,
                   idx,
+                  isDecoy: false,
                 }));
               })
             : [];
 
-          const derivedMaxTimeFromPaths =
-            trainPaths.length > 0
-              ? Math.max(...trainPaths.map((path) => path.length), 0)
-              : 0;
-
-          const derivedMaxTimeFromLengths =
-            trainPathLengths.length > 0
-              ? Math.max(...trainPathLengths, 0)
-              : 0;
-
-          const bestMaxTime = Math.max(
-            derivedMaxTimeFromPaths,
-            derivedMaxTimeFromLengths
+          const rawDecoyPaths = safeParseJSON(data?.decoy_paths, []);
+          const rawDecoyPathLengths = safeParseJSON(
+            data?.decoy_path_lengths,
+            []
           );
+          decoyPathLengths = Array.isArray(rawDecoyPathLengths)
+            ? rawDecoyPathLengths.map((len) => Number(len) || 0)
+            : [];
 
-          maxTimeStep = Number.isFinite(bestMaxTime) ? bestMaxTime : 0;
+          decoyPaths = Array.isArray(rawDecoyPaths)
+            ? rawDecoyPaths.map((path, idx) => {
+                if (!Array.isArray(path)) {
+                  return [];
+                }
+
+                const positions = path
+                  .map((step) => {
+                    if (!Array.isArray(step)) {
+                      return null;
+                    }
+                    const [row, col] = step;
+                    if (
+                      typeof row !== "number" ||
+                      typeof col !== "number"
+                    ) {
+                      return null;
+                    }
+                    return { row, col };
+                  })
+                  .filter(Boolean);
+
+                const computedSteps = determineStepDirections(
+                  positions,
+                  initialDecoyPositions[idx]?.direction ?? null
+                );
+
+                return computedSteps.map((step) => ({
+                  ...step,
+                  idx,
+                  isDecoy: true,
+                }));
+              })
+            : [];
+
+          maxTimeStep = Number.isFinite(max_arrival_time) ? max_arrival_time : 0;
 
           computeGateStates();
           computeDSwitchStates();
 
-          if (maxTimeStep > 0 || initialTrainPositions.length > 0) {
+          if (maxTimeStep > 0 || initialTrainPositions.length > 0 || initialDecoyPositions.length > 0) {
             timelineControls.style.display = "block";
             timeSlider.min = 0;
             timeSlider.max = maxTimeStep;
@@ -818,9 +899,11 @@
             timeLabel.textContent = "0";
           }
 
+          const trainPositions = getPositionsAtTime(currentTimeStep, trainPaths, initialTrainPositions);
+          const decoyPositions = getPositionsAtTime(currentTimeStep, decoyPaths, initialDecoyPositions);
           drawGrid(
             currentGridData,
-            getTrainPositionsAtTime(currentTimeStep)
+            [...trainPositions, ...decoyPositions]
           );
         }
 
@@ -836,11 +919,15 @@
           currentTimeStep = clampedValue;
           event.target.value = clampedValue;
           timeLabel.textContent = `${clampedValue} / ${maxTimeStep}`;
+          
+          const trainPositions = getPositionsAtTime(currentTimeStep, trainPaths, initialTrainPositions);
+          const decoyPositions = getPositionsAtTime(currentTimeStep, decoyPaths, initialDecoyPositions);
+
           drawGrid(
             currentGridData,
             clampedValue === 0
-              ? initialTrainPositions
-              : getTrainPositionsAtTime(currentTimeStep)
+              ? [...initialTrainPositions, ...initialDecoyPositions]
+              : [...trainPositions, ...decoyPositions]
           );
           timeSliderInUpdate = false;
         });
