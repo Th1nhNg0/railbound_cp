@@ -122,9 +122,9 @@
         "data/7/7-7C.dzn",
         "data/7/7-8.dzn",
         "data/7/7-9.dzn",
-        "main.mzn",
-        "solver.mpc"
+        "main.mzn"
     ],
-    "selectedSolverConfigFile": "solver.mpc",
+    "selectedBuiltinConfigId": "org.chuffed.chuffed",
+    "selectedBuiltinConfigVersion": "0.13.2",
     "version": 106
 }

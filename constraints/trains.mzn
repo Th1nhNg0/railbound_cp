@@ -89,7 +89,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
 % --- Train Arrival Constraint ---
 % A train is considered arrived when it reaches the target and remains there for all subsequent timesteps.
 constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME where time >= arrival_time[t]) (
-    (train_row[t, time] = TARGET.1 /\ train_col[t, time] = TARGET.2 /\ train_dir[t, time] = train_dir[t, time-1])
+    (train_row[t, time] = TARGET.1 /\ train_col[t, time] = TARGET.2 /\ train_dir[t, time] = LEFT)
 );
 
 % --- Sequential Arrival Constraint ---
