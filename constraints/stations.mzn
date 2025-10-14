@@ -6,15 +6,15 @@
 % Tracks the remaining wait time for each train at each timestep.
 % 0 means no waiting, positive values mean the train must wait for that many more timesteps.
 array[1..N_TRAINS, 0..MAX_TIME] of var 0..2: station_wait_time;
-array[1..max(1, N_DECOYS), 0..MAX_TIME] of var 0..2: decoy_station_wait_time;
+array[1..N_DECOYS, 0..MAX_TIME] of var 0..2: decoy_station_wait_time;
 
 % Tracks whether each station has been visited by its assigned vehicle at or before each timestep.
 % Once true at timestep t, it remains true for all subsequent timesteps.
-array[1..max(1, N_STATIONS), 0..MAX_TIME] of var bool: station_visited_by_time;
+array[1..N_STATIONS, 0..MAX_TIME] of var bool: station_visited_by_time;
 
 % --- Station Assignment Mapping ---
 % For efficiency, pre-calculate all stations assigned to each vehicle.
-int: MAX_STATIONS_PER_VEHICLE = if N_STATIONS = 0 then 1 else N_STATIONS endif;
+int: MAX_STATIONS_PER_VEHICLE = N_STATIONS;
 
 % For Trains
 array[1..N_TRAINS, 1..MAX_STATIONS_PER_VEHICLE] of int: train_station_indices = array2d(1..N_TRAINS, 1..MAX_STATIONS_PER_VEHICLE, [
@@ -35,7 +35,7 @@ array[1..N_TRAINS] of int: train_station_count = [
 | t in 1..N_TRAINS];
 
 % For Decoys
-array[1..max(1, N_DECOYS), 1..MAX_STATIONS_PER_VEHICLE] of int: decoy_station_indices = array2d(1..max(1, N_DECOYS), 1..MAX_STATIONS_PER_VEHICLE, [
+array[1..N_DECOYS, 1..MAX_STATIONS_PER_VEHICLE] of int: decoy_station_indices = array2d(1..N_DECOYS, 1..MAX_STATIONS_PER_VEHICLE, [
   if N_STATIONS = 0 then 0
   else
     let { 
@@ -44,13 +44,13 @@ array[1..max(1, N_DECOYS), 1..MAX_STATIONS_PER_VEHICLE] of int: decoy_station_in
     } in
     if s <= num_matches then matching_stations[s] else 0 endif
   endif
-| d in 1..max(1, N_DECOYS), s in 1..MAX_STATIONS_PER_VEHICLE]);
+| d in 1..N_DECOYS, s in 1..MAX_STATIONS_PER_VEHICLE]);
 
-array[1..max(1, N_DECOYS)] of int: decoy_station_count = [
+array[1..N_DECOYS] of int: decoy_station_count = [
   if N_STATIONS = 0 then 0
   else length([st | st in 1..N_STATIONS where STATIONS[st].3 = -d])
   endif
-| d in 1..max(1, N_DECOYS)];
+| d in 1..N_DECOYS];
 
 % --- Station Visitation Tracking ---
 % Track whether each station has been visited by its assigned vehicle by each timestep.
@@ -76,8 +76,6 @@ constraint if N_STATIONS > 0 then
       station_visited_by_time[st, time] = (vehicle_at_station_now \/ was_visited_before)
     )
   )
-else
-  forall(time in 0..MAX_TIME)(station_visited_by_time[1, time] = false)
 endif;
 
 % --- Station Wait Time Constraints ---

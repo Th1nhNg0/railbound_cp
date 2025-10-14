@@ -125,7 +125,6 @@
         "main.mzn",
         "solver.mpc"
     ],
-    "selectedBuiltinConfigId": "cp-sat",
-    "selectedBuiltinConfigVersion": "9.14.6206",
+    "selectedSolverConfigFile": "solver.mpc",
     "version": 106
 }

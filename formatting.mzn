@@ -16,7 +16,6 @@ any: initial_data = (
 );
 any: solution_data :: output_only = (
   grid: showJSON(grid),
-  max_arrival_time: showJSON(if N_TRAINS > 0 then max(arrival_time) else 0 endif),
   train_paths: showJSON([
     (
       if fix(arrival_time[t]) > 0 then
@@ -26,7 +25,6 @@ any: solution_data :: output_only = (
     )
     | t in 1..N_TRAINS
   ]),
-  train_path_lengths: showJSON([ fix(arrival_time[t]) | t in 1..N_TRAINS ]),
   decoy_paths: showJSON(
     if N_DECOYS > 0 then
       [
@@ -38,7 +36,6 @@ any: solution_data :: output_only = (
     else []
     endif
   ),
-  decoy_path_lengths: showJSON(if N_DECOYS > 0 then [ MAX_TIME | d in 1..N_DECOYS ] else [] endif),
   should_toggle: showJSON(should_toggle),
   eswitch_toggled: showJSON(eswitch_toggled)
 );

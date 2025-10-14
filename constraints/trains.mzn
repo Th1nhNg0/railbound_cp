@@ -20,7 +20,7 @@ constraint forall(t in 1..N_TRAINS) (
   train_row[t, 0] = r0 /\
   train_col[t, 0] = c0 /\
   can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
-  if blocked_by_gate then
+  if N_GATES>0 /\ blocked_by_gate then
     train_row[t, 1] = r0 /\
     train_col[t, 1] = c0 /\
     train_dir[t, 1] = intended_entry_dir
@@ -47,12 +47,12 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
     var 1..H: intended_r;
     var 1..W: intended_c;
     var Dir: intended_entry_dir;
-    var bool: blocked_by_gate = if cell_has_gate[intended_r, intended_c] then
+    var bool: blocked_by_gate = if N_GATES>0 /\ cell_has_gate[intended_r, intended_c] then
         not gate_open[gate_index_at[intended_r, intended_c], time+1]
       else false endif;
     var Piece: effective_piece = 
-      if piece in DSWITCHES_SET then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
-      elseif piece in ESWITCHES_SET then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
+      if N_DSWITCHES > 0 /\ cell_has_dswitch[r, c] then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
+      elseif N_ESWITCHES > 0 /\ cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
       else piece endif;
   } in
 
@@ -88,8 +88,8 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
 
 % --- Train Arrival Constraint ---
 % A train is considered arrived when it reaches the target and remains there for all subsequent timesteps.
-constraint forall(t in 1..N_TRAINS) (
-    (train_row[t, arrival_time[t]] = TARGET.1 /\ train_col[t, arrival_time[t]] = TARGET.2)
+constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME where time >= arrival_time[t]) (
+    (train_row[t, time] = TARGET.1 /\ train_col[t, time] = TARGET.2 /\ train_dir[t, time] = train_dir[t, time-1])
 );
 
 % --- Sequential Arrival Constraint ---

@@ -303,9 +303,7 @@
 
         let currentGridData = null;
         let trainPaths = [];
-        let trainPathLengths = [];
         let decoyPaths = [];
-        let decoyPathLengths = [];
         let gateOpenStates = [];
         let dswitchToggledStates = [];
         let eswitchToggledStates = [];
@@ -783,18 +781,9 @@
 
           currentGridData = safeParseJSON(data?.grid, null);
           shouldToggle = safeParseJSON(data?.should_toggle, []);
-          const max_arrival_time = safeParseJSON(data?.max_arrival_time, 0);
           eswitchToggledStates = safeParseJSON(data?.eswitch_toggled, []);
 
           const rawTrainPaths = safeParseJSON(data?.train_paths, []);
-          const rawPathLengths = safeParseJSON(
-            data?.train_path_lengths,
-            []
-          );
-          trainPathLengths = Array.isArray(rawPathLengths)
-            ? rawPathLengths.map((len) => Number(len) || 0)
-            : [];
-
           trainPaths = Array.isArray(rawTrainPaths)
             ? rawTrainPaths.map((path, idx) => {
                 if (!Array.isArray(path)) {
@@ -831,14 +820,6 @@
             : [];
 
           const rawDecoyPaths = safeParseJSON(data?.decoy_paths, []);
-          const rawDecoyPathLengths = safeParseJSON(
-            data?.decoy_path_lengths,
-            []
-          );
-          decoyPathLengths = Array.isArray(rawDecoyPathLengths)
-            ? rawDecoyPathLengths.map((len) => Number(len) || 0)
-            : [];
-
           decoyPaths = Array.isArray(rawDecoyPaths)
             ? rawDecoyPaths.map((path, idx) => {
                 if (!Array.isArray(path)) {
@@ -874,7 +855,15 @@
               })
             : [];
 
-          maxTimeStep = Number.isFinite(max_arrival_time) ? max_arrival_time : 0;
+          const trainPathLengths = rawTrainPaths.map((p) => p.length);
+          const decoyPathLengths = rawDecoyPaths.map((p) => p.length);
+
+          const maxTrainTime =
+            trainPathLengths.length > 0 ? Math.max(...trainPathLengths) : 0;
+          const maxDecoyTime =
+            decoyPathLengths.length > 0 ? Math.max(...decoyPathLengths) : 0;
+
+          maxTimeStep = Math.max(maxTrainTime, maxDecoyTime);
 
           computeGateStates();
           computeDSwitchStates();

@@ -19,7 +19,7 @@ constraint forall(d in 1..N_DECOYS) (
     Dir: intended_entry_dir = opposite[dir0]; % Direction decoy will face when entering target cell
     % Check if a gate blocks the intended first move
     var bool: blocked_by_gate =
-      if cell_has_gate[intended_r, intended_c] then
+      if N_GATES >0 /\ cell_has_gate[intended_r, intended_c] then
         not gate_open[gate_index_at[intended_r, intended_c], 1]
       else false endif;
   } in
@@ -58,13 +58,13 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
         var 0..W+1: intended_c;                              % Intended target column (may be out of bounds)
         var Dir: intended_entry_dir;                         % Direction decoy would face in intended target
         % Check if a gate blocks movement to the intended destination
-        var bool: blocked_by_gate = if cell_has_gate[intended_r, intended_c] then
+        var bool: blocked_by_gate = if N_GATES >0 /\ cell_has_gate[intended_r, intended_c] then
                 not gate_open[gate_index_at[intended_r, intended_c], time+1]
             else false endif;
         % Determine the effective piece type, accounting for switch states
         var Piece: effective_piece = 
-            if piece in DSWITCHES_SET then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
-            elseif piece in ESWITCHES_SET then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
+            if N_DSWITCHES > 0 /\ cell_has_dswitch[r, c] then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
+            elseif N_ESWITCHES > 0 /\ cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
             else piece endif;
     } in
 

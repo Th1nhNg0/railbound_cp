@@ -1,5 +1,0 @@
-{
-    "intermediate-solutions": true,
-    "output-objective": true,
-    "solver": "org.chuffed.chuffed@0.13.2"
-}
