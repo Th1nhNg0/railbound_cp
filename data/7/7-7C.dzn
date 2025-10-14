@@ -1,7 +1,7 @@
 W=9;
 H=9;
 
-MAX_TIME=W*H;
+MAX_TIME=42;
 MAX_TRACKS=15;
 
 TARGET=(9,9);
@@ -15,10 +15,10 @@ INIT_POS=[
 (2,3,ROCK),
 (2,5,STRAIGHT_TD),
 (2,7,ROCK),
-(3,1,ROCK),
+(3,1,ROCK),  
 (3,2,ROCK),
 (3,3,ROCK),
-(3,7,ROCK),
+(3,7,ROCK),  
 (3,8,ROCK),
 (3,9,ROCK),
 (4,5,ESWITCH_L_R_D),

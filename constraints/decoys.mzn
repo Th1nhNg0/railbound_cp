@@ -1,8 +1,8 @@
-constraint forall(t in 1..N_DECOYS) (
+constraint forall(d in 1..N_DECOYS) (
   let {
-    int: r0 = DECOYS[t].1;
-    int: c0 = DECOYS[t].2;
-    Dir: dir0 = DECOYS[t].3;
+    int: r0 = DECOYS[d].1;
+    int: c0 = DECOYS[d].2;
+    Dir: dir0 = DECOYS[d].3;
     int: intended_r = r0 + dr[dir0];
     int: intended_c = c0 + dc[dir0];
     Dir: intended_entry_dir = opposite[dir0];
@@ -11,31 +11,31 @@ constraint forall(t in 1..N_DECOYS) (
         not gate_open[gate_index_at[intended_r, intended_c], 1]
       else false endif;
   } in
-  decoy_row[t, 0] = r0 /\
-  decoy_col[t, 0] = c0 /\
+  decoy_row[d, 0] = r0 /\
+  decoy_col[d, 0] = c0 /\
   can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
   if blocked_by_gate then
-    decoy_row[t, 1] = r0 /\
-    decoy_col[t, 1] = c0 /\
-    decoy_dir[t, 1] = intended_entry_dir
+    decoy_row[d, 1] = r0 /\
+    decoy_col[d, 1] = c0 /\
+    decoy_dir[d, 1] = intended_entry_dir
   else
-    decoy_row[t, 1] = intended_r /\
-    decoy_col[t, 1] = intended_c /\
-    decoy_dir[t, 1] = intended_entry_dir
+    decoy_row[d, 1] = intended_r /\
+    decoy_col[d, 1] = intended_c /\
+    decoy_dir[d, 1] = intended_entry_dir
   endif
 );
 
 
-constraint forall(t in 1..N_DECOYS, time in 1..MAX_TIME-1) (
+constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
     let {
-        var 1..H: r = decoy_row[t, time];
-        var 1..W: c = decoy_col[t, time];
-        var Dir: entry_dir = decoy_dir[t, time];
+        var 1..H: r = decoy_row[d, time];
+        var 1..W: c = decoy_col[d, time];
+        var Dir: entry_dir = decoy_dir[d, time];
         var Piece: piece = grid[r, c];
         var Dir: exit_dir;
-        var 1..H: next_r = decoy_row[t, time+1];
-        var 1..W: next_c = decoy_col[t, time+1];
-        var Dir: next_entry_dir = decoy_dir[t, time+1];
+        var 1..H: next_r = decoy_row[d, time+1];
+        var 1..W: next_c = decoy_col[d, time+1];
+        var Dir: next_entry_dir = decoy_dir[d, time+1];
         var 0..H+1: intended_r;
         var 0..W+1: intended_c;
         var Dir: intended_entry_dir;
@@ -49,7 +49,7 @@ constraint forall(t in 1..N_DECOYS, time in 1..MAX_TIME-1) (
     } in
 
     % If the decoy is waiting at a station, it remains stationary.
-    if station_wait_time[t, time] > 0 \/ piece = EMPTY then
+    if decoy_station_wait_time[d, time] > 0 \/ piece = EMPTY then
         (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
     else
         (if piece in TUNNELS_SET then
