@@ -1,7 +1,8 @@
 W=8;
 H=8;
 
-MAX_TIME=15;
+% smaller MAX_TIME will make the decoy go to the target but limited by MAX_TIME -> wrong answer
+MAX_TIME=18;
 MAX_TRACKS=18;
 
 TARGET=(5,8);

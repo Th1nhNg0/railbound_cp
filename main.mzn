@@ -43,7 +43,7 @@ array[1..N_DECOYS, 0..MAX_TIME] of var 1..H: decoy_row;
 array[1..N_DECOYS, 0..MAX_TIME] of var 1..W: decoy_col;
 array[1..N_DECOYS, 1..MAX_TIME] of var Dir: decoy_dir;
 
-array[1..N_TRAINS] of var N_TRAINS..MAX_TIME: arrival_time;
+array[1..N_TRAINS] of var 1..MAX_TIME: arrival_time;
 % The state (true=open, false=closed) of each gate `g` at each timestep `i`.
 array[1..max(1, N_GATES), 0..MAX_TIME] of var bool: gate_open;
 % The state of each dynamic switch at each timestep.

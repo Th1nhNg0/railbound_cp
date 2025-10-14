@@ -73,3 +73,17 @@ output [
   ) ++ "\n"
   | t in 1..N_TRAINS
 ]
+++
+(if N_DECOYS > 0 then
+  ["\nDECOY PATHS:\n"]
+  ++
+  [
+    "Decoy \(d):\n" ++
+    "  Path: " ++ show(
+      (
+          [ (decoy_row[d, time], decoy_col[d, time]) | time in 1..MAX_TIME ]
+      )
+    ) ++ "\n"
+    | d in 1..N_DECOYS
+  ]
+else [] endif)
