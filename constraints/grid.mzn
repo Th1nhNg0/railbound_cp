@@ -65,3 +65,10 @@ constraint forall(r in 1..H, c in 1..W)(
     )
   ) = (if grid[r, c] in SWITCHES_SET then 3 else 2 endif)
 );
+
+
+% if solver place a piece, it must be used by at least one train or decoy
+constraint forall(r in 1..H, c in 1..W)(
+ grid[r,c] != EMPTY /\ not cell_is_init[r, c] -> exists(t in 1..N_TRAINS, i in 1..arrival_time[t])(train_row[t,i]=r /\ train_col[t,i]=c)
+ \/ exists(d in 1..N_DECOYS, i in 1..MAX_TIME)(decoy_row[d,i]=r /\ decoy_col[d,i]=c)
+);

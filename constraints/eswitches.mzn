@@ -37,6 +37,7 @@ constraint if N_ESWITCHES > 0 then
                     % Decoy was at eswitch cell at time t-1
                     decoy_row[d, t - 1] = ESWITCHES_DERIVED[es].1 /\
                     decoy_col[d, t - 1] = ESWITCHES_DERIVED[es].2 /\
+                    (decoy_row[d, t] != ESWITCHES_DERIVED[es].1 \/ decoy_col[d, t] != ESWITCHES_DERIVED[es].2) /\
                     % Decoy is NOT at this cell at time t (has exited)
                     (decoy_row[d, t-2] != ESWITCHES_DERIVED[es].1 \/ decoy_col[d, t-2] != ESWITCHES_DERIVED[es].2)
                 )
