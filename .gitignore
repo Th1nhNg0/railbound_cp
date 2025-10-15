@@ -1,8 +1,7 @@
 results/
 __pycache__/
-benchmark_results/
-*.csv
-*.txt
+/benchmark_results/
+!/docs/benchmark_results/
 .DS_Store
 renders/
 .vscode/

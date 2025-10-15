@@ -26,13 +26,14 @@
 #   ./run_benchmarks.sh -s gecode -l "1,3" -t 60000
 #
 
+
 # --- Default Parameters ---
-SOLVER="chuffed"         # The MiniZinc solver to use.
-TIME_LIMIT=300000       # Time limit per puzzle in milliseconds (5 minutes).
 LEVELS=""               # Comma-separated list of level directories to run (e.g., "1,2,8"). Default is all.
 OUTPUT_DIR="benchmark_results" # Directory to store output files.
 MODEL_FILE="main.mzn"   # The main MiniZinc model file.
-PARALLEL=4              # Number of parallel threads for the solver.
+
+# --- MiniZinc Arguments (combined) ---
+MINIZINC_ARGUMENTS="--solver chuffed --time-limit 300000 --statistics"
 
 # --- Colors for Output ---
 RED='\033[0;31m'
@@ -49,25 +50,21 @@ usage() {
     echo "Usage: $0 [options]"
     echo ""
     echo "Options:"
-    echo "  -s SOLVER     MiniZinc solver to use (default: $SOLVER)"
-    echo "  -t TIMELIMIT  Time limit in milliseconds (default: $TIME_LIMIT)"
+    echo "  -a ARGS       MiniZinc arguments (default: \"--solver chuffed --time-limit 300000 --statistics\")"
     echo "  -l LEVELS     Comma-separated list of level directories (e.g., \"1,3\" or \"all\") (default: all)"
     echo "  -o OUTPUTDIR  Output directory (default: $OUTPUT_DIR)"
     echo "  -m MODELFILE  Model file (default: $MODEL_FILE)"
-    echo "  -p PARALLEL   Number of parallel threads (default: $PARALLEL)"
     echo "  -h            Show this help"
     exit 1
 }
 
 # --- Argument Parsing ---
-while getopts "s:t:l:o:m:p:h" opt; do
+while getopts "a:l:o:m:h" opt; do
     case $opt in
-        s) SOLVER="$OPTARG" ;;
-        t) TIME_LIMIT="$OPTARG" ;;
+        a) MINIZINC_ARGUMENTS="$OPTARG" ;;
         l) LEVELS="$OPTARG" ;;
         o) OUTPUT_DIR="$OPTARG" ;;
         m) MODEL_FILE="$OPTARG" ;;
-        p) PARALLEL="$OPTARG" ;;
         h) usage ;;
         *) usage ;;
     esac
@@ -79,7 +76,7 @@ mkdir -p "$OUTPUT_DIR"
 
 # Generate timestamped filenames for the output reports.
 timestamp=$(date +%Y%m%d_%H%M%S)
-csvfile="$OUTPUT_DIR/benchmark_${SOLVER}_${timestamp}.csv"
+csvfile="$OUTPUT_DIR/benchmark_${timestamp}.csv"
 
 # Set the data directory where puzzle files are located.
 data_dir="data"
@@ -112,16 +109,15 @@ echo -e "${CYAN}============================================================"
 echo -e "Railbound Benchmark Suite"
 echo -e "============================================================"
 echo "Model      : $MODEL_FILE"
-echo "Solver     : $SOLVER"
-echo "Time Limit : $TIME_LIMIT ms"
+echo "Solver/Args: $MINIZINC_ARGUMENTS"
 echo "Levels     : $(echo "${LEVEL_DIRS_ARRAY[@]}" | sed 's|data/||g; s|/||g' | tr '\n' ',' | sed 's/,$//')"
 echo "Output CSV : $csvfile"
-echo "Command    : minizinc --solver $SOLVER --time-limit $TIME_LIMIT --statistics ${PARALLEL:+ -p $PARALLEL} $MODEL_FILE <Data>${GRAY}"
+echo "Command    : minizinc $MINIZINC_ARGUMENTS $MODEL_FILE <Data>${GRAY}"
 echo -e "${CYAN}============================================================${NC}\n"
 
 # --- Initialize CSV and Statistics ---
 # Write the header row to the CSV file.
-csv_header="timestamp,level,puzzle,status,solver,solveTime,failures,propagations,flatBoolVars,flatIntVars,flatBoolConstraints,flatIntConstraints,flatTime,boolVariables"
+csv_header="timestamp,level,puzzle,status,solveTime,failures,propagations,flatBoolVars,flatIntVars,flatBoolConstraints,flatIntConstraints,flatTime,boolVariables"
 echo "$csv_header" > "$csvfile"
 
 # Initialize counters for the final summary.
@@ -168,7 +164,7 @@ for level_dir in "${LEVEL_DIRS_ARRAY[@]}"; do
         
         # Execute the MiniZinc solver and capture output, exit code, and timing.
         start_time=$(date +%s)
-        output=$(minizinc --solver "$SOLVER" --time-limit "$TIME_LIMIT" --statistics ${PARALLEL:+-p $PARALLEL} "$MODEL_FILE" "$puzzle_file" 2>&1)
+    output=$(minizinc $MINIZINC_ARGUMENTS "$MODEL_FILE" "$puzzle_file" 2>&1)
         exit_code=$?
         end_time=$(date +%s)
         duration=$(( (end_time - start_time) * 1000 ))
@@ -213,7 +209,7 @@ for level_dir in "${LEVEL_DIRS_ARRAY[@]}"; do
         
         # Append the results for this puzzle to the CSV file.
         row_ts=$(date +%Y-%m-%dT%H:%M:%S)
-        csv_line="$row_ts,$level,$puzzle_name,$status,$SOLVER,$solve_time,$failures,$propagations,$flatBoolVars,$flatIntVars,$flatBoolConstraints,$flatIntConstraints,$flatTime,$boolVariables"
+        csv_line="$row_ts,$level,$puzzle_name,$status,$solve_time,$failures,$propagations,$flatBoolVars,$flatIntVars,$flatBoolConstraints,$flatIntConstraints,$flatTime,$boolVariables"
         echo "$csv_line" >> "$csvfile"
         
         # Display the result for this puzzle in the console.
@@ -237,8 +233,7 @@ summary_text="============================================================
 Railbound Benchmark Summary
 ============================================================
 Timestamp  : $(date +%Y-%m-%d\ %H:%M:%S)
-Solver     : $SOLVER
-Time Limit : $TIME_LIMIT ms
+Arguments  : $MINIZINC_ARGUMENTS
 Model      : $MODEL_FILE
 
 RESULTS
@@ -260,6 +255,10 @@ Avg Failures   : $avg_failures (for successful puzzles)
 
 # Print the summary to the console.
 echo -e "\n${CYAN}$summary_text${NC}"
+
+# Append the summary to the CSV file.
+echo "" >> "$csvfile"
+echo "$summary_text" >> "$csvfile"
 
 echo -e "\n${GREEN}Benchmark complete! Results saved to:${NC}"
 echo "  CSV:     $csvfile"
