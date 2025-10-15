@@ -136,26 +136,13 @@ constraint forall(d in 1..N_DECOYS, i in 1..MAX_TIME)(
 % DECOY-DECOY POSITION SWAP PREVENTION
 % Ensures two decoys cannot exchange positions between consecutive time steps
 constraint forall(d1 in 1..N_DECOYS, d2 in d1 + 1..N_DECOYS, i in 1..MAX_TIME-1)(
-    let {
-        % Get effective positions (accounting for tunnel exits)
-        var tuple(1..H, 1..W): eff_pos1 = get_effective_pos(decoy_row[d1, i], decoy_col[d1, i]),
-        var tuple(1..H, 1..W): eff_pos2 = get_effective_pos(decoy_row[d2, i], decoy_col[d2, i])
-    } in
-    % Prevent position swapping: if decoy1 is at position A and decoy2 at position B,
-    % then decoy1 cannot move to B while decoy2 moves to A
-    eff_pos1 != (decoy_row[d2, i+1], decoy_col[d2, i+1]) \/
-    eff_pos2 != (decoy_row[d1, i+1], decoy_col[d1, i+1])
+    tunnel_dest[decoy_row[d1, i], decoy_col[d1, i]] != (decoy_row[d2, i+1], decoy_col[d2, i+1]) \/
+    tunnel_dest[decoy_row[d1, i], decoy_col[d1, i]] != (decoy_row[d1, i+1], decoy_col[d1, i+1])
 );
 
 % DECOY-TRAIN POSITION SWAP PREVENTION
 % Ensures decoys and player trains cannot exchange positions between consecutive time steps
 constraint forall(d1 in 1..N_DECOYS, d2 in 1..N_TRAINS, i in 1..MAX_TIME-1 where i <= arrival_time[d2])(
-    let {
-        % Get effective positions (accounting for tunnel exits)
-        var tuple(1..H, 1..W): eff_pos1 = get_effective_pos(decoy_row[d1, i], decoy_col[d1, i]),
-        var tuple(1..H, 1..W): eff_pos2 = get_effective_pos(train_row[d2, i], train_col[d2, i])
-    } in
-    % Prevent position swapping between decoys and trains
-    eff_pos1 != (train_row[d2, i+1], train_col[d2, i+1]) \/
-    eff_pos2 != (decoy_row[d1, i+1], decoy_col[d1, i+1])
+    tunnel_dest[decoy_row[d1, i], decoy_col[d1, i]] != (train_row[d2, i+1], train_col[d2, i+1]) \/
+    tunnel_dest[train_row[d2, i], train_col[d2, i]] != (decoy_row[d1, i+1], decoy_col[d1, i+1])
 );

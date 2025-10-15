@@ -32,7 +32,7 @@ array[1..H, 1..W] of tuple(1..H, 1..W): tunnel_dest =
     } in
     if idx_A > 0 then (TUNNEL_PAIRS[idx_A].4, TUNNEL_PAIRS[idx_A].5)
     elseif idx_B > 0 then (TUNNEL_PAIRS[idx_B].1, TUNNEL_PAIRS[idx_B].2)
-    else (1, 1) %dummy value for non-tunnels
+    else (r, c) % non-tunnel cells map to themselves
     endif
   | r in 1..H, c in 1..W
   ]);
@@ -326,9 +326,3 @@ function var Piece: dswitch_effective_piece(var Piece: base_piece, var bool: tog
 % Function to get the effective piece type for an ESWITCH based on its toggle state.
 function var Piece: eswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
   if toggled then eswitch_toggle[base_piece] else base_piece endif;
-
-% --- Position Utilities ---
-
-% Helper function to get effective position (considering tunnels)
-function var tuple(1..H, 1..W): get_effective_pos(var 1..H: r, var 1..W: c) = 
-    if grid[r, c] in TUNNELS_SET then tunnel_dest[r, c] else (r, c) endif;
