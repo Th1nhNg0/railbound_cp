@@ -107,8 +107,8 @@ constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME wh
 % Prevents trains from swapping positions in consecutive time steps (including through tunnels).
 constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1 where i < arrival_time[t1])(
     let {
-        var tuple(1..W, 1..H): eff_pos1 = get_effective_pos(train_row[t1, i], train_col[t1, i]),
-        var tuple(1..W, 1..H): eff_pos2 = get_effective_pos(train_row[t2, i], train_col[t2, i])
+        var tuple(1..H, 1..W): eff_pos1 = get_effective_pos(train_row[t1, i], train_col[t1, i]),
+        var tuple(1..H, 1..W): eff_pos2 = get_effective_pos(train_row[t2, i], train_col[t2, i])
     } in
     % They cannot swap positions
     eff_pos1 != (train_row[t2, i+1], train_col[t2, i+1]) \/
