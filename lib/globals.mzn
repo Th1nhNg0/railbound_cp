@@ -24,8 +24,7 @@ array[Dir] of Dir: opposite = [ DOWN, LEFT, TOP, RIGHT ];
 % --- Tunnel Lookup Tables ---
 
 % Maps each cell to its tunnel destination (row, col).
-% Returns (0,0) if the cell is not a tunnel.
-array[1..H, 1..W] of tuple(int, int): tunnel_dest =
+array[1..H, 1..W] of tuple(1..H, 1..W): tunnel_dest =
   array2d(1..H, 1..W, [
     let {
       int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
@@ -33,7 +32,7 @@ array[1..H, 1..W] of tuple(int, int): tunnel_dest =
     } in
     if idx_A > 0 then (TUNNEL_PAIRS[idx_A].4, TUNNEL_PAIRS[idx_A].5)
     elseif idx_B > 0 then (TUNNEL_PAIRS[idx_B].1, TUNNEL_PAIRS[idx_B].2)
-    else (0, 0)
+    else (1, 1) %dummy value for non-tunnels
     endif
   | r in 1..H, c in 1..W
   ]);

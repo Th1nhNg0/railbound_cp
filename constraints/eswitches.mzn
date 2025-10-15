@@ -24,7 +24,7 @@ constraint if N_ESWITCHES > 0 then
         let {
             % Count the number of trains and decoys that exited from this eswitch cell in the previous timestep.
             % A train/decoy exits when it was at the eswitch cell at time t-1 but is somewhere else at time t.
-            var int: num_exits = sum(tr in 1..N_TRAINS where arrival_time[tr] >= t)(
+            var 1..N_TRAINS+N_DECOYS: num_exits = sum(tr in 1..N_TRAINS where arrival_time[tr] >= t)(
                 bool2int(
                     % Train was at eswitch cell at time t-1
                     train_row[tr, t - 1] = ESWITCHES_DERIVED[es].1 /\

@@ -69,17 +69,16 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
     } in
 
     % Movement logic: decoys stay stationary if waiting at station or on empty cell
-    if decoy_station_wait_time[d, time] > 0 \/ piece = EMPTY then
+    if piece = EMPTY then
         (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
     else
         % Handle special case: tunnel teleportation
         (if piece in TUNNELS_SET then
                  let {
-                         var tuple(int, int): dest = tunnel_dest[r, c];        % Tunnel exit coordinates
-                         var int: dest_exit_dir = tunnel_exit_dir[r, c];       % Direction to exit tunnel
-                         var Dir: dest_exit_dir_enum = to_enum(Dir, dest_exit_dir);
-                         var int: dest_r = dest.1;                            % Tunnel exit row
-                         var int: dest_c = dest.2;                            % Tunnel exit column
+                         var tuple(1..H, 1..W): dest = tunnel_dest[r, c];        % Tunnel exit coordinates
+                         var Dir: dest_exit_dir_enum = to_enum(Dir, tunnel_exit_dir[r, c]);
+                         var 1..H: dest_r = dest.1;                            % Tunnel exit row
+                         var 1..W: dest_c = dest.2;                            % Tunnel exit column
                  } in
                  % Set intended position as one step beyond tunnel exit
                  intended_r = dest_r + dr[dest_exit_dir_enum] /\
@@ -139,8 +138,8 @@ constraint forall(d in 1..N_DECOYS, i in 1..MAX_TIME)(
 constraint forall(d1 in 1..N_DECOYS, d2 in d1 + 1..N_DECOYS, i in 1..MAX_TIME-1)(
     let {
         % Get effective positions (accounting for tunnel exits)
-        var tuple(1..W, 1..H): eff_pos1 = get_effective_pos(decoy_row[d1, i], decoy_col[d1, i]),
-        var tuple(1..W, 1..H): eff_pos2 = get_effective_pos(decoy_row[d2, i], decoy_col[d2, i])
+        var tuple(1..H, 1..W): eff_pos1 = get_effective_pos(decoy_row[d1, i], decoy_col[d1, i]),
+        var tuple(1..H, 1..W): eff_pos2 = get_effective_pos(decoy_row[d2, i], decoy_col[d2, i])
     } in
     % Prevent position swapping: if decoy1 is at position A and decoy2 at position B,
     % then decoy1 cannot move to B while decoy2 moves to A
@@ -153,8 +152,8 @@ constraint forall(d1 in 1..N_DECOYS, d2 in d1 + 1..N_DECOYS, i in 1..MAX_TIME-1)
 constraint forall(d1 in 1..N_DECOYS, d2 in 1..N_TRAINS, i in 1..MAX_TIME-1 where i <= arrival_time[d2])(
     let {
         % Get effective positions (accounting for tunnel exits)
-        var tuple(1..W, 1..H): eff_pos1 = get_effective_pos(decoy_row[d1, i], decoy_col[d1, i]),
-        var tuple(1..W, 1..H): eff_pos2 = get_effective_pos(train_row[d2, i], train_col[d2, i])
+        var tuple(1..H, 1..W): eff_pos1 = get_effective_pos(decoy_row[d1, i], decoy_col[d1, i]),
+        var tuple(1..H, 1..W): eff_pos2 = get_effective_pos(train_row[d2, i], train_col[d2, i])
     } in
     % Prevent position swapping between decoys and trains
     eff_pos1 != (train_row[d2, i+1], train_col[d2, i+1]) \/

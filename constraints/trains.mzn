@@ -62,11 +62,10 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
   else
     (if piece in TUNNELS_SET then
        let {
-         var tuple(int, int): dest = tunnel_dest[r, c];
-         var int: dest_exit_dir = tunnel_exit_dir[r, c];
-         var Dir: dest_exit_dir_enum = to_enum(Dir, dest_exit_dir);
-         var int: dest_r = dest.1;
-         var int: dest_c = dest.2;
+         var tuple(1..H, 1..W): dest = tunnel_dest[r, c];
+         var Dir: dest_exit_dir_enum = to_enum(Dir, tunnel_exit_dir[r, c]);
+         var 1..H: dest_r = dest.1;
+         var 1..W: dest_c = dest.2;
        } in
        intended_r = dest_r + dr[dest_exit_dir_enum] /\
        intended_c = dest_c + dc[dest_exit_dir_enum] /\
