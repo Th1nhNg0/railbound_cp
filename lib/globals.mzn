@@ -23,16 +23,30 @@ array[Dir] of Dir: opposite = [ DOWN, LEFT, TOP, RIGHT ];
 
 % --- Tunnel Lookup Tables ---
 
-% Maps each cell to its tunnel destination (row, col).
-array[1..H, 1..W] of tuple(1..H, 1..W): tunnel_dest =
+% Maps each cell to its tunnel destination row.
+array[1..H, 1..W] of 1..H: tunnel_dest_row =
   array2d(1..H, 1..W, [
     let {
       int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
       int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
     } in
-    if idx_A > 0 then (TUNNEL_PAIRS[idx_A].4, TUNNEL_PAIRS[idx_A].5)
-    elseif idx_B > 0 then (TUNNEL_PAIRS[idx_B].1, TUNNEL_PAIRS[idx_B].2)
-    else (r, c) % non-tunnel cells map to themselves
+    if idx_A > 0 then TUNNEL_PAIRS[idx_A].4
+    elseif idx_B > 0 then TUNNEL_PAIRS[idx_B].1
+    else r % non-tunnel cells map to themselves
+    endif
+  | r in 1..H, c in 1..W
+  ]);
+
+% Maps each cell to its tunnel destination column.
+array[1..H, 1..W] of 1..W: tunnel_dest_col =
+  array2d(1..H, 1..W, [
+    let {
+      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
+      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
+    } in
+    if idx_A > 0 then TUNNEL_PAIRS[idx_A].5
+    elseif idx_B > 0 then TUNNEL_PAIRS[idx_B].2
+    else c % non-tunnel cells map to themselves
     endif
   | r in 1..H, c in 1..W
   ]);

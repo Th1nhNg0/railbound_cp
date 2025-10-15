@@ -58,14 +58,15 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
 
   % If the train is waiting at a station, it remains stationary.
   if station_wait_time[t, time] > 0 then
-    (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
+    next_r = r /\
+    next_c = c /\
+    next_entry_dir = entry_dir
   else
     (if piece in TUNNELS_SET then
        let {
-         var tuple(1..H, 1..W): dest = tunnel_dest[r, c];
+         var 1..H: dest_r = tunnel_dest_row[r, c];
+         var 1..W: dest_c = tunnel_dest_col[r, c];
          var Dir: dest_exit_dir_enum = to_enum(Dir, tunnel_exit_dir[r, c]);
-         var 1..H: dest_r = dest.1;
-         var 1..W: dest_c = dest.2;
        } in
        intended_r = dest_r + dr[dest_exit_dir_enum] /\
        intended_c = dest_c + dc[dest_exit_dir_enum] /\
@@ -78,9 +79,13 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
      endif) /\
     can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
     if blocked_by_gate then
-      (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
+      next_r = r /\
+      next_c = c /\
+      next_entry_dir = entry_dir
     else
-      (next_r, next_c, next_entry_dir) = (intended_r, intended_c, intended_entry_dir)
+      next_r = intended_r /\
+      next_c = intended_c /\
+      next_entry_dir = intended_entry_dir
     endif  
   endif
 );
@@ -88,7 +93,9 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
 % --- Train Arrival Constraint ---
 % A train is considered arrived when it reaches the target and remains there for all subsequent timesteps.
 constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME where time >= arrival_time[t]) (
-    (train_row[t, time] = TARGET.1 /\ train_col[t, time] = TARGET.2 /\ train_dir[t, time] = LEFT)
+    train_row[t, time] = TARGET.1 /\
+    train_col[t, time] = TARGET.2 /\
+    train_dir[t, time] = LEFT
 );
 
 % --- Sequential Arrival Constraint ---
@@ -105,7 +112,9 @@ constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME wh
 
 % --- No Position Swap Constraint ---
 % Prevents trains from swapping positions in consecutive time steps (including through tunnels).
-constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1 where i < arrival_time[t1])(
-    tunnel_dest[train_row[t1, i], train_col[t1, i]] != (train_row[t2, i+1], train_col[t2, i+1]) \/
-    tunnel_dest[train_row[t1, i], train_col[t1, i]]  != (train_row[t1, i+1], train_col[t1, i+1])
+constraint forall(t1 in 1..N_TRAINS-1, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1 where i < arrival_time[t1])(
+    (tunnel_dest_row[train_row[t1, i], train_col[t1, i]] != train_row[t2, i+1] \/
+     tunnel_dest_col[train_row[t1, i], train_col[t1, i]] != train_col[t2, i+1]) \/
+    (tunnel_dest_row[train_row[t1, i], train_col[t1, i]] != train_row[t1, i+1] \/
+     tunnel_dest_col[train_row[t1, i], train_col[t1, i]] != train_col[t1, i+1])
 );
