@@ -1,61 +1,62 @@
+% ============================================================
+% main.mzn - Railbound Constraint Programming Solver
+% ============================================================
+% Core model that combines grid placement, train movement, decoy behavior,
+% and all puzzle mechanics (gates, switches, stations, tunnels, activations).
+% Solves Railbound puzzle levels by finding valid track placements and routes.
+% ============================================================
+
 include "globals.mzn";
 include "lib/types.mzn";
 
-int: W;        
-int: H;          
-int: MAX_TIME;   
-int: MAX_TRACKS; 
-tuple(int, int): TARGET;
-array[int] of tuple(int, int, Dir): TRAINS;    
-array[int] of tuple(int, int, Dir): DECOYS;    
-array[int] of tuple(int, int, Piece): INIT_POS;
-array[int] of tuple(int, int, Dir, int, int, Dir): TUNNEL_PAIRS;
-array[int] of tuple(int, int, int, bool): GATES;             
-array[int] of tuple(int, int, int): ACTIVATIONS;
-array[int] of tuple(int, int, int): DSWITCHES;   
-array[int] of tuple(int, int, int): STATIONS;    
+% ==== INPUT PARAMETERS (from puzzle data file) ====
+int: W;          % Grid width (columns).
+int: H;          % Grid height (rows).
+int: MAX_TIME;   % Maximum time horizon for solving.
+int: MAX_TRACKS; % Max tracks allowed to be placed (puzzle constraint).
+tuple(int, int): TARGET; % Target destination for trains.
+array[int] of tuple(int, int, Dir): TRAINS;    % Train starting positions and initial directions.
+array[int] of tuple(int, int, Dir): DECOYS;    % Decoy train starting positions and initial directions.
+array[int] of tuple(int, int, Piece): INIT_POS; % Pre-placed tracks that cannot be moved.
+array[int] of tuple(int, int, Dir, int, int, Dir): TUNNEL_PAIRS; % Tunnel entrance-exit pairs.
+array[int] of tuple(int, int, int, bool): GATES; % Gates: (row, col, activation_id, initial_state).
+array[int] of tuple(int, int, int): ACTIVATIONS; % Activation cells: (row, col, activation_id).
+array[int] of tuple(int, int, int): DSWITCHES; % Dynamic switches: (row, col, activation_id).
+array[int] of tuple(int, int, int): STATIONS; % Stations: (row, col, train_id).
 
-% ============================================================
-% COMPUTED PARAMETERS
-% ============================================================
-
-int: N_TRAINS = length(TRAINS);
-int: N_DECOYS = length(DECOYS);
-int: N_INIT_POS = length(INIT_POS);  
-int: N_TUNNELS = length(TUNNEL_PAIRS);
-int: N_GATES = length(GATES);
-int: N_ACTIVATIONS = length(ACTIVATIONS);
-int: N_DSWITCHES = length(DSWITCHES);
-int: N_STATIONS = length(STATIONS);
-int: N_ESWITCHES = sum(i in 1..N_INIT_POS)(bool2int(INIT_POS[i].3 in ESWITCHES_SET));
+% ==== DERIVED COUNTS (computed from input) ====
+int: N_TRAINS = length(TRAINS);          % Number of player trains to solve for.
+int: N_DECOYS = length(DECOYS);          % Number of decoy trains to avoid.
+int: N_INIT_POS = length(INIT_POS);      % Number of pre-placed track pieces.
+int: N_TUNNELS = length(TUNNEL_PAIRS);   % Number of tunnel pairs.
+int: N_GATES = length(GATES);            % Number of gates.
+int: N_ACTIVATIONS = length(ACTIVATIONS); % Number of activation tiles.
+int: N_DSWITCHES = length(DSWITCHES);    % Number of dynamic switches.
+int: N_STATIONS = length(STATIONS);      % Number of stations.
+int: N_ESWITCHES = sum(i in 1..N_INIT_POS)(bool2int(INIT_POS[i].3 in ESWITCHES_SET)); % Number of exit-triggered switches.
 
 include "lib/globals.mzn";
 
-% ============================================================
-% DECISION VARIABLES
-% ============================================================
-array[1..H, 1..W] of var Piece: grid;
-array[1..N_TRAINS, 0..MAX_TIME] of var 1..H: train_row;
-array[1..N_TRAINS, 0..MAX_TIME] of var 1..W: train_col;
-array[1..N_TRAINS, 1..MAX_TIME] of var Dir: train_dir;
+% ==== DECISION VARIABLES ====
 
-array[1..N_DECOYS, 0..MAX_TIME] of var 1..H: decoy_row;
-array[1..N_DECOYS, 0..MAX_TIME] of var 1..W: decoy_col;
-array[1..N_DECOYS, 1..MAX_TIME] of var Dir: decoy_dir;
+% Grid: Tracks and pieces to place on the puzzle board.
+array[1..H, 1..W] of var Piece: grid; % Grid cells contain track pieces (straights, corners, switches, etc.).
 
-array[1..N_TRAINS] of var 1..MAX_TIME: arrival_time;
-% The state (true=open, false=closed) of each gate `g` at each timestep `i`.
-array[1..N_GATES, 0..MAX_TIME] of var bool: gate_open;
-% The state of each dynamic switch at each timestep.
-% A DSWITCH has two possible states representing its toggled configuration.
-% For example, DSWITCH_T_D_R can toggle to DSWITCH_D_T_R.
-% We track this as a boolean: false=original orientation, true=toggled orientation.
-array[1..N_DSWITCHES, 0..MAX_TIME] of var bool: dswitch_toggled;
-% The state of each exit-triggered switch at each timestep.
-% An ESWITCH has two possible states representing its toggled configuration.
-% For example, ESWITCH_T_D_R can toggle to ESWITCH_D_T_R.
-% We track this as a boolean: false=original orientation, true=toggled orientation.
-array[1..N_ESWITCHES, 0..MAX_TIME] of var bool: eswitch_toggled;
+% Train Movement: Position and direction of each train at each timestep.
+array[1..N_TRAINS, 0..MAX_TIME] of var 1..H: train_row;     % Train row position over time.
+array[1..N_TRAINS, 0..MAX_TIME] of var 1..W: train_col;     % Train column position over time.
+array[1..N_TRAINS, 1..MAX_TIME] of var Dir: train_dir;      % Direction train enters each cell.
+array[1..N_TRAINS] of var 1..MAX_TIME: arrival_time;        % When each train reaches the target.
+
+% Decoy Movement: Position and direction of each decoy train (obstacle to avoid).
+array[1..N_DECOYS, 0..MAX_TIME] of var 1..H: decoy_row;     % Decoy row position over time.
+array[1..N_DECOYS, 0..MAX_TIME] of var 1..W: decoy_col;     % Decoy column position over time.
+array[1..N_DECOYS, 1..MAX_TIME] of var Dir: decoy_dir;      % Direction decoy enters each cell.
+
+% Gate/Switch State: Toggle states for gates, dynamic switches, and exit-triggered switches.
+array[1..N_GATES, 0..MAX_TIME] of var bool: gate_open;      % Gate state over time (true=open, false=closed).
+array[1..N_DSWITCHES, 0..MAX_TIME] of var bool: dswitch_toggled; % Dswitch toggle state (false=original, true=toggled).
+array[1..N_ESWITCHES, 0..MAX_TIME] of var bool: eswitch_toggled; % Eswitch toggle state (false=original, true=toggled).
 
 % ============================================================
 % CONSTRAINTS

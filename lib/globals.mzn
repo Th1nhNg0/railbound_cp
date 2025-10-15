@@ -1,29 +1,19 @@
-% lib/globals.mzn
-%
-% Defines global lookup tables and derived data structures for the Railbound model.
-%
-% This file uses the parameters and input arrays (e.g., `TUNNEL_PAIRS`, `GATES`)
-% to compute helper arrays and lookup tables. These structures are essential for
-% efficient constraint formulation, providing pre-calculated information about
-% grid features like tunnel destinations, gate locations, and switch indices.
-% It requires `lib/types.mzn` to be included first.
-
 % ============================================================
-% Global Lookup Tables
+% lib/globals.mzn - Global Lookup Tables & Helper Structures
+% ============================================================
+% Pre-computes lookup tables essential for efficient constraint formulation.
+% Includes directional offsets, tunnel mappings, gate/switch metadata,
+% and routing permission matrices. Requires lib/types.mzn to be included first.
 % ============================================================
 
-% --- Directional Helpers ---
+% ==== DIRECTIONAL HELPERS ====
+% Offset arrays for translating directions to grid movements.
+array[Dir] of int: dr = [ -1,  0,  1,  0 ]; % Row offsets [TOP, RIGHT, DOWN, LEFT].
+array[Dir] of int: dc = [  0,  1,  0, -1 ]; % Column offsets [TOP, RIGHT, DOWN, LEFT].
+array[Dir] of Dir: opposite = [ DOWN, LEFT, TOP, RIGHT ]; % Opposite direction for each entry.
 
-% dr: row offset for each direction [TOP, RIGHT, DOWN, LEFT].
-array[Dir] of int: dr = [ -1,  0,  1,  0 ];
-% dc: column offset for each direction [TOP, RIGHT, DOWN, LEFT].
-array[Dir] of int: dc = [  0,  1,  0, -1 ];
-% opposite: lookup table for the opposing direction.
-array[Dir] of Dir: opposite = [ DOWN, LEFT, TOP, RIGHT ];
-
-% --- Tunnel Lookup Tables ---
-
-% Maps each cell to its tunnel destination row.
+% ==== TUNNEL LOOKUP TABLES ====
+% Maps tunnel cells to their destination coordinates and exit direction.
 array[1..H, 1..W] of 1..H: tunnel_dest_row =
   array2d(1..H, 1..W, [
     let {
@@ -66,64 +56,50 @@ array[1..H, 1..W] of int: tunnel_exit_dir =
   | r in 1..H, c in 1..W
   ]);
 
-% --- Gate Metadata ---
-
-% Upper bound for the gate index, ensuring it's at least 1.
-int: GATE_INDEX_UPPER = if N_GATES = 0 then 1 else N_GATES endif;
-% Maps each cell (r,c) to the index of the gate at that location. Returns 1 for cells without gates.
+% ==== GATE METADATA ====
+% Maps cells to gates and tracks gate placement.
+int: GATE_INDEX_UPPER = if N_GATES = 0 then 1 else N_GATES endif; % Bounds gate index lookup.
 array[1..H, 1..W] of 1..GATE_INDEX_UPPER: gate_index_at =
   array2d(1..H, 1..W, [ let { int: g_idx = if N_GATES = 0 then 0 else sum(g in 1..N_GATES where GATES[g].1 = r /\ GATES[g].2 = c)(g) endif; } in if g_idx > 0 then g_idx else 1 endif | r in 1..H, c in 1..W ]);
-% A boolean grid indicating if a cell contains a gate.
 array[1..H, 1..W] of bool: cell_has_gate =
   array2d(1..H, 1..W, [ let { int: count = if N_GATES = 0 then 0 else sum(g in 1..N_GATES where GATES[g].1 = r /\ GATES[g].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
 
-% --- Dynamic Switch Metadata ---
-
-% Upper bound for the dynamic switch index, ensuring it's at least 1.
-int: DSWITCH_INDEX_UPPER = if N_DSWITCHES = 0 then 1 else N_DSWITCHES endif;
-% Maps each cell (r,c) to the index of the dynamic switch at that location. Returns 1 for cells without dynamic switches.
+% ==== DYNAMIC SWITCH METADATA ====
+% Maps cells to dynamic switches and tracks their placement.
+int: DSWITCH_INDEX_UPPER = if N_DSWITCHES = 0 then 1 else N_DSWITCHES endif; % Bounds dswitch index lookup.
 array[1..H, 1..W] of 1..DSWITCH_INDEX_UPPER: dswitch_index_at =
   array2d(1..H, 1..W, [ let { int: ds_idx = if N_DSWITCHES = 0 then 0 else sum(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c)(ds) endif; } in if ds_idx > 0 then ds_idx else 1 endif | r in 1..H, c in 1..W ]);
-% A boolean grid indicating if a cell contains a dynamic switch.
 array[1..H, 1..W] of bool: cell_has_dswitch =
   array2d(1..H, 1..W, [ let { int: count = if N_DSWITCHES = 0 then 0 else sum(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
 
-% --- Exit-triggered Switch Metadata ---
-
-% Array of coordinates for all exit-triggered switches, derived from INIT_POS.
+% ==== EXIT-TRIGGERED SWITCH METADATA ====
+% Maps cells to exit-triggered switches and tracks their placement.
 array[1..N_ESWITCHES] of tuple(int, int): ESWITCHES_DERIVED =
-  [(INIT_POS[i].1, INIT_POS[i].2) | i in 1..N_INIT_POS where INIT_POS[i].3 in ESWITCHES_SET];
-% Upper bound for the exit-triggered switch index, ensuring it's at least 1.
-int: ESWITCH_INDEX_UPPER = if N_ESWITCHES = 0 then 1 else N_ESWITCHES endif;
-% Maps each cell (r,c) to the index of the exit-triggered switch at that location. Returns 1 for cells without exit-triggered switches.
+  [(INIT_POS[i].1, INIT_POS[i].2) | i in 1..N_INIT_POS where INIT_POS[i].3 in ESWITCHES_SET]; % Coordinates of all ESWITCHes.
+int: ESWITCH_INDEX_UPPER = if N_ESWITCHES = 0 then 1 else N_ESWITCHES endif; % Bounds eswitch index lookup.
 array[1..H, 1..W] of 1..ESWITCH_INDEX_UPPER: eswitch_index_at =
   array2d(1..H, 1..W, [ let { int: es_idx = if N_ESWITCHES = 0 then 0 else sum(es in 1..N_ESWITCHES where ESWITCHES_DERIVED[es].1 = r /\ ESWITCHES_DERIVED[es].2 = c)(es) endif; } in if es_idx > 0 then es_idx else 1 endif | r in 1..H, c in 1..W ]);
-% A boolean grid indicating if a cell contains an exit-triggered switch.
 array[1..H, 1..W] of bool: cell_has_eswitch =
   array2d(1..H, 1..W, [ let { int: count = if N_ESWITCHES = 0 then 0 else sum(es in 1..N_ESWITCHES where ESWITCHES_DERIVED[es].1 = r /\ ESWITCHES_DERIVED[es].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
 
-% --- Station Metadata ---
-
-% Upper bound for the station index, ensuring it's at least 1.
-int: STATION_INDEX_UPPER = if N_STATIONS = 0 then 1 else N_STATIONS endif;
-% Maps each cell (r,c) to the index of the station at that location. Returns 1 for cells without stations.
+% ==== STATION METADATA ====
+% Maps cells to stations and tracks their placement.
+int: STATION_INDEX_UPPER = if N_STATIONS = 0 then 1 else N_STATIONS endif; % Bounds station index lookup.
 array[1..H, 1..W] of 1..STATION_INDEX_UPPER: station_index_at =
   array2d(1..H, 1..W, [ let { int: st_idx = if N_STATIONS = 0 then 0 else sum(st in 1..N_STATIONS where STATIONS[st].1 = r /\ STATIONS[st].2 = c)(st) endif; } in if st_idx > 0 then st_idx else 1 endif | r in 1..H, c in 1..W ]);
-% A boolean grid indicating if a cell contains a station.
 array[1..H, 1..W] of bool: cell_has_station =
   array2d(1..H, 1..W, [ let { int: count = if N_STATIONS = 0 then 0 else sum(st in 1..N_STATIONS where STATIONS[st].1 = r /\ STATIONS[st].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
 
-% --- Pre-placed Piece Lookup ---
+% ==== PRE-PLACED PIECE TRACKING ====
+% Boolean grid indicating which cells contain fixed, unmovable pieces.
+array[1..H, 1..W] of bool: cell_is_init =
+  array2d(1..H, 1..W, [ let { 
+    int: init_count = if N_INIT_POS = 0 then 0 else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(1) endif;
+    int: tunnel_count = if N_TUNNELS = 0 then 0 else sum(i in 1..N_TUNNELS where (TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c) \/ (TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c))(1) endif;
+  } in init_count > 0 \/ tunnel_count > 0 | r in 1..H, c in 1..W ]);
 
-% A boolean grid indicating if a cell contains a pre-placed, unmovable piece (from INIT_POS or tunnels).
-  array[1..H, 1..W] of bool: cell_is_init =
-    array2d(1..H, 1..W, [ let { 
-      int: init_count = if N_INIT_POS = 0 then 0 else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(1) endif;
-      int: tunnel_count = if N_TUNNELS = 0 then 0 else sum(i in 1..N_TUNNELS where (TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c) \/ (TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c))(1) endif;
-    } in init_count > 0 \/ tunnel_count > 0 | r in 1..H, c in 1..W ]);
-% --- Routing Permission Tables ---
-
-% can_enter[p, d] is true if a train can enter a piece `p` from direction `d`.
+% ==== ROUTING PERMISSION TABLES ====
+% can_enter[p, d]: true if a train entering from direction d can enter piece p.
 array[Piece, Dir] of bool: can_enter = array2d(Piece, Dir, [
 %              TOP    RIGHT  DOWN   LEFT
   false, false, false, false,  % EMPTY
@@ -164,7 +140,8 @@ array[Piece, Dir] of bool: can_enter = array2d(Piece, Dir, [
   false, false, false, false   % ROCK
 ]);
 
-% can_exit[p, d] is true if a train can exit a piece `p` towards direction `d`.
+% can_exit[p, d]: true if a train exiting piece p toward direction d can exit.
+% This combines routing: a piece permits exit in direction d if it can reach d from entering from opposite.
 array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
 %              TOP    RIGHT  DOWN   LEFT
   false, false, false, false,  % EMPTY
@@ -205,12 +182,12 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
   false, false, false, false   % ROCK
 ]);
 
-% can_connect[p, d] is true if a train can connect to piece `p` from direction `d`.
-% This combines can_enter and can_exit: a piece can be connected from direction d
-% if it can either enter from d or exit towards d.
+% can_connect[p, d]: true if direction d is relevant to piece p (entry or exit possible).
+% Used for routing validation and connectivity checks.
 array[Piece, Dir] of bool: can_connect = array2d(Piece, Dir, [can_enter[p, d] \/ can_exit[p, d] | p in Piece, d in Dir]);
 
-% exit_of[p, d] determines the exit direction when entering piece `p` from direction `d`.
+% exit_of[p, d]: Determines the exit direction when entering piece p from direction d.
+% Core routing: determines where a train ends up after traversing piece p.
 array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
 %            TOP    RIGHT  DOWN   LEFT
   TOP,   TOP,   TOP,   TOP,   % EMPTY
@@ -251,8 +228,9 @@ array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
   TOP,   TOP,   TOP,   TOP    % ROCK
 ]);
 
-% --- Dynamic Switch Toggle Mapping ---
-% Maps a DSWITCH piece to its toggled counterpart.
+% ==== SWITCH TOGGLE MAPPINGS ====
+% dswitch_toggle[p]: Maps a DSWITCH to its toggled state counterpart.
+% When a train passes through a dswitch, it toggles to the mapped piece.
 array[Piece] of Piece: dswitch_toggle = [
   EMPTY,         % EMPTY
   STRAIGHT_TD,   % STRAIGHT_TD
@@ -292,8 +270,8 @@ array[Piece] of Piece: dswitch_toggle = [
   ROCK           % ROCK
 ];
 
-% --- Exit-triggered Switch Toggle Mapping ---
-% Maps an ESWITCH piece to its toggled counterpart.
+% eswitch_toggle[p]: Maps an ESWITCH to its toggled state counterpart.
+% When any train exits an eswitch, it toggles to the mapped piece.
 array[Piece] of Piece: eswitch_toggle = [
   EMPTY,         % EMPTY
   STRAIGHT_TD,   % STRAIGHT_TD
@@ -333,10 +311,11 @@ array[Piece] of Piece: eswitch_toggle = [
   ROCK           % ROCK
 ];
 
-% Function to get the effective piece type for a DSWITCH based on its toggle state.
+% ==== HELPER FUNCTIONS ====
+% dswitch_effective_piece: Applies the current toggle state to get the actual piece routing.
 function var Piece: dswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
-  if toggled then dswitch_toggle[base_piece] else base_piece endif;
+  if toggled then dswitch_toggle[base_piece] else base_piece endif; % Returns toggled or original piece.
 
-% Function to get the effective piece type for an ESWITCH based on its toggle state.
+% eswitch_effective_piece: Applies the current toggle state to get the actual piece routing.
 function var Piece: eswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
-  if toggled then eswitch_toggle[base_piece] else base_piece endif;
+  if toggled then eswitch_toggle[base_piece] else base_piece endif; % Returns toggled or original piece.

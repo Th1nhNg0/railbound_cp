@@ -1,24 +1,27 @@
 % ============================================================
-% GRID CONSTRAINTS
+% constraints/grid.mzn - Grid Placement & Track Constraints
+% ============================================================
+% Enforces grid composition rules: track limits, pre-placed pieces,
+% tunnel placements, and connectivity of manually placed tracks.
 % ============================================================
 
-% --- Track Limit Constraint ---
+% ==== TRACK LIMIT CONSTRAINT ====
 % Ensures the number of placed tracks does not exceed MAX_TRACKS.
-% Track Limit Constraint: Count only non-empty, non-initial, non-tunnel cells as placed tracks.
-int: INIT_EMPTY = W*H - (N_INIT_POS + 2 * N_TUNNELS);
+% Counts only non-empty, non-initial, non-tunnel cells as placed tracks.
+int: INIT_EMPTY = W*H - (N_INIT_POS + 2 * N_TUNNELS); % Initial empty count.
 constraint
   INIT_EMPTY - sum(r in 1..H, c in 1..W)(
       bool2int(grid[r, c] == EMPTY)
-    ) <= MAX_TRACKS;
+    ) <= MAX_TRACKS; % Placed tracks ≤ limit.
 
-% --- Initial Position Constraint ---
-% Ensures that pre-placed pieces are correctly placed on the grid.
+% ==== INITIAL POSITION CONSTRAINT ====
+% Pre-placed pieces from INIT_POS must appear exactly as specified.
 constraint forall(i in 1..N_INIT_POS)(
-    grid[INIT_POS[i].1, INIT_POS[i].2] = INIT_POS[i].3
+    grid[INIT_POS[i].1, INIT_POS[i].2] = INIT_POS[i].3 % Fixed pieces.
 );
 
-% --- Tunnel Placement Constraint ---
-% Ensures that tunnel pairs are correctly placed with the appropriate orientations.
+% ==== TUNNEL PLACEMENT CONSTRAINT ====
+% Tunnel entrance and exit must match their paired orientations.
 constraint forall(i in 1..N_TUNNELS)(
   let {
     int: r1 = TUNNEL_PAIRS[i].1;
@@ -29,30 +32,28 @@ constraint forall(i in 1..N_TUNNELS)(
     Dir: dir2 = TUNNEL_PAIRS[i].6;
   } in
   grid[r1, c1] = (if dir1 == TOP then TUNNEL_T elseif dir1 == DOWN then TUNNEL_D elseif dir1 == LEFT then TUNNEL_L else TUNNEL_R endif) /\
-  grid[r2, c2] = (if dir2 == TOP then TUNNEL_T elseif dir2 == DOWN then TUNNEL_D elseif dir2 == LEFT then TUNNEL_L else TUNNEL_R endif)
+  grid[r2, c2] = (if dir2 == TOP then TUNNEL_T elseif dir2 == DOWN then TUNNEL_D elseif dir2 == LEFT then TUNNEL_L else TUNNEL_R endif) % Tunnels placed with correct orientation.
 );
 
-% --- Special Piece Init Constraint ---
-% Ensures that switches and tunnels must be pre-placed (cannot be placed dynamically).
+% ==== SPECIAL PIECES MUST BE PRE-PLACED ====
+% Dswitches, Eswitches, and Tunnels cannot be placed dynamically.
 constraint forall(r in 1..H, c in 1..W)(
-    (grid[r, c] in UNPLACEABLE_PIECES)-> cell_is_init[r, c]
+    (grid[r, c] in UNPLACEABLE_PIECES)-> cell_is_init[r, c] % Only pre-placed allowed.
 );
 
-% --- Train Path Validity Constraint ---
-% Ensures that trains only move on valid track cells (not EMPTY and not ROCK).
+% ==== TRAIN PATH VALIDITY ====
+% Trains move only on valid track (not EMPTY, not ROCK).
 constraint forall(t in 1..N_TRAINS, i in 1..arrival_time[t])(
     grid[train_row[t, i], train_col[t, i]] != EMPTY /\
-    grid[train_row[t, i], train_col[t, i]] != ROCK
+    grid[train_row[t, i], train_col[t, i]] != ROCK % Valid track required.
 );
 
-% --- Connectivity Constraint ---
-% Ensures that switches have exactly 3 and corners have exactly 2 valid connecting neighbors.
+% ==== CONNECTIVITY CONSTRAINT ====
+% Manually placed switches must have 3 neighbors; corners must have 2.
 constraint forall(r in 1..H, c in 1..W)(
-  % If this cell has a switch or corner that's not pre-placed
   (((grid[r, c] in SWITCHES_SET) \/ (grid[r, c] in CORNERS_SET)) /\
-  not cell_is_init[r, c])
+  not cell_is_init[r, c]) % Only if manually placed.
   ->
-  % Then the number of directions that have valid connecting neighbors matches requirements
   sum(d in Dir)(
     let {
       int: nr = r + dr[d];
@@ -61,14 +62,14 @@ constraint forall(r in 1..H, c in 1..W)(
     bool2int(
       nr >= 1 /\ nr <= H /\ nc >= 1 /\ nc <= W /\ 
       can_connect[grid[r, c], d] /\
-      can_connect[grid[nr, nc], opposite[d]]
+      can_connect[grid[nr, nc], opposite[d]] % Neighbors must match connectivity.
     )
   ) = (if grid[r, c] in SWITCHES_SET then 3 else 2 endif)
 );
 
-
-% if solver place a piece, it must be used by at least one train or decoy
+% ==== PLACED PIECE USAGE CONSTRAINT ====
+% Manually placed pieces must be traversed by at least one train or decoy.
 constraint forall(r in 1..H, c in 1..W)(
  grid[r,c] != EMPTY /\ not cell_is_init[r, c] -> exists(t in 1..N_TRAINS, i in 1..arrival_time[t])(train_row[t,i]=r /\ train_col[t,i]=c)
- \/ exists(d in 1..N_DECOYS, i in 1..MAX_TIME)(decoy_row[d,i]=r /\ decoy_col[d,i]=c)
+ \/ exists(d in 1..N_DECOYS, i in 1..MAX_TIME)(decoy_row[d,i]=r /\ decoy_col[d,i]=c) % Piece must be used.
 );

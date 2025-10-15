@@ -1,5 +1,14 @@
+% ============================================================
+% formatting.mzn - Solution Visualization & Output Formatting
+% ============================================================
+% Prepares solution data for visualization and textual output.
+% Formats grid state, train/decoy paths, and switch states for display.
+% ============================================================
+
 include "ide/vis.mzn";
 
+% ==== VISUALIZATION DATA ====
+% Package all puzzle input data for the visualizer.
 any: initial_data = (
   grid_width: W,
   grid_height: H,
