@@ -331,5 +331,5 @@ function var Piece: eswitch_effective_piece(var Piece: base_piece, var bool: tog
 % --- Position Utilities ---
 
 % Helper function to get effective position (considering tunnels)
-function var tuple(int, int): get_effective_pos(var int: r, var int: c) = 
+function var tuple(1..W, 1..H): get_effective_pos(var 1..W: r, var 1..H: c) = 
     if grid[r, c] in TUNNELS_SET then tunnel_dest[r, c] else (r, c) endif;
