@@ -48,6 +48,12 @@ constraint SEMAPHORE_SUPPLY = 0 -> forall(r in 1..H, c in 1..W)(not semaphore_pr
 constraint forall(r in 1..H, c in 1..W)(
   semaphore_present[r, c] ->
     grid[r, c] in SEMAPHORE_ELIGIBLE_SET /\
+    (N_GATES = 0 \/ not cell_has_gate[r, c]) /\
+    (if N_ACTIVATIONS = 0 then true else
+      forall(a in 1..N_ACTIVATIONS)(
+        ACTIVATIONS[a].1 != r \/ ACTIVATIONS[a].2 != c
+      )
+    endif) /\
     exists(d in Dir)(
       let {
         int: sr = r + dr[d];

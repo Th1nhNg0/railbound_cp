@@ -59,6 +59,7 @@ Levels that allow the player to place semaphores must set `SEMAPHORE_SUPPLY > 0`
 
 - Trains and decoys stop on the preceding cell while the semaphore is closed.
 - When any train or decoy enters one of the adjacent switches, the semaphore opens on the following timestep and stays open for the remainder of the run. If no train ever enters a linked switch, the semaphore remains closed throughout the solution.
+- Semaphores cannot be placed on tiles that already host a gate or an activation pad; those pieces keep their original overlays.
 - The solver decides which eligible cells receive semaphores, up to the provided `SEMAPHORE_SUPPLY` amount; omit the parameter or set it to `0` when the feature is absent.
 
 ## Stations

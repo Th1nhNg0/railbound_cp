@@ -1,7 +1,8 @@
 {
     "openFiles": [
+        "main.mzn"
     ],
-    "openTab": -1,
+    "openTab": 0,
     "projectFiles": [
         "data/1/1-1.dzn",
         "data/1/1-10.dzn",
