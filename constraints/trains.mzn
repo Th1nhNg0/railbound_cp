@@ -74,7 +74,10 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
       else piece endif;
   } in
 
-  if station_wait_time[t, time] > 0 then % Wait at station: don't move.
+  let {
+    var bool: waiting = if N_STATIONS = 0 then false else station_wait_time[t, time] > 0 endif;
+  } in
+  if waiting then % Wait at station: don't move.
     next_r = r /\
     next_c = c /\
     next_entry_dir = entry_dir

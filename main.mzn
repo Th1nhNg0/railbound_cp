@@ -54,13 +54,16 @@ array[1..N_DECOYS, 0..MAX_TIME] of var 1..W: decoy_col;     % Decoy column posit
 array[1..N_DECOYS, 1..MAX_TIME] of var Dir: decoy_dir;      % Direction decoy enters each cell.
 
 % Gate/Switch State: Toggle states for gates, dynamic switches, and exit-triggered switches.
-array[1..N_GATES, 0..MAX_TIME] of var bool: gate_open;      % Gate state over time (true=open, false=closed).
-array[1..N_DSWITCHES, 0..MAX_TIME] of var bool: dswitch_toggled; % Dswitch toggle state (false=original, true=toggled).
-array[1..N_ESWITCHES, 0..MAX_TIME] of var bool: eswitch_toggled; % Eswitch toggle state (false=original, true=toggled).
+set of int: GATE_INDICES = if N_GATES = 0 then {} else 1..N_GATES endif;
+set of int: DSWITCH_INDICES = if N_DSWITCHES = 0 then {} else 1..N_DSWITCHES endif;
+set of int: ESWITCH_INDICES = if N_ESWITCHES = 0 then {} else 1..N_ESWITCHES endif;
+array[GATE_INDICES, 0..MAX_TIME] of var bool: gate_open;      % Gate state over time (true=open, false=closed).
+array[DSWITCH_INDICES, 0..MAX_TIME] of var bool: dswitch_toggled; % Dswitch toggle state (false=original, true=toggled).
+array[ESWITCH_INDICES, 0..MAX_TIME] of var bool: eswitch_toggled; % Eswitch toggle state (false=original, true=toggled).
 
-% Semaphore Placement: Coordinate slots (0,0 means unused) and derived presence grid.
-int: SEMAPHORE_SLOT_COUNT = if SEMAPHORE_SUPPLY = 0 then 1 else SEMAPHORE_SUPPLY endif;
-set of int: SEMAPHORE_SLOTS = 1..SEMAPHORE_SLOT_COUNT;
+% Semaphore Placement: Coordinate slots (empty set if no supply) and derived presence grid.
+int: SEMAPHORE_SLOT_COUNT = SEMAPHORE_SUPPLY;
+set of int: SEMAPHORE_SLOTS = if SEMAPHORE_SLOT_COUNT = 0 then {} else 1..SEMAPHORE_SLOT_COUNT endif;
 array[SEMAPHORE_SLOTS] of var 0..H: semaphore_place_row;    % Row position for each semaphore slot (0 => unused).
 array[SEMAPHORE_SLOTS] of var 0..W: semaphore_place_col;    % Column position for each semaphore slot (0 => unused).
 array[1..H, 1..W] of var bool: semaphore_present =

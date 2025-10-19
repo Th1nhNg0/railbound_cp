@@ -8,7 +8,8 @@
 
 % ==== STATION DECISION VARIABLES ====
 % station_wait_time[t, time]: remaining wait steps (0 = no waiting, >0 = waiting).
-array[1..N_TRAINS, 0..MAX_TIME] of var 0..2: station_wait_time;
+set of int: STATION_TIMES = if N_STATIONS = 0 then {} else 0..MAX_TIME endif;
+array[1..N_TRAINS, STATION_TIMES] of var 0..2: station_wait_time;
 
 % station_visited_by_time[st, time]: true if station st visited by time step.
 array[1..N_STATIONS, 0..MAX_TIME] of var bool: station_visited_by_time;
@@ -61,7 +62,7 @@ endif;
 
 % ==== STATION WAIT TIME CONSTRAINT ====
 % Trains wait 2 steps on first arrival at any assigned station.
-constraint forall(t in 1..N_TRAINS, time in 0..MAX_TIME) (
+constraint forall(t in 1..N_TRAINS, time in STATION_TIMES) (
   let {
     int: num_stations = train_station_count[t];
     var bool: at_any_station = if num_stations = 0 then false % No stations assigned.
