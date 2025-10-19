@@ -23,14 +23,14 @@ constraint forall(i in 1..N_INIT_POS)(
 % ==== TUNNEL PLACEMENT CONSTRAINT ====
 % Tunnel entrance and exit must match their paired orientations.
 constraint forall(i in 1..N_TUNNELS)(
-  let {
-    int: r1 = TUNNEL_PAIRS[i].1;
-    int: c1 = TUNNEL_PAIRS[i].2;
-    Dir: dir1 = TUNNEL_PAIRS[i].3;
-    int: r2 = TUNNEL_PAIRS[i].4;
-    int: c2 = TUNNEL_PAIRS[i].5;
-    Dir: dir2 = TUNNEL_PAIRS[i].6;
-  } in
+    let {
+      1..H: r1 = TUNNEL_PAIRS[i].1;
+      1..W: c1 = TUNNEL_PAIRS[i].2;
+      Dir: dir1 = TUNNEL_PAIRS[i].3;
+      1..H: r2 = TUNNEL_PAIRS[i].4;
+      1..W: c2 = TUNNEL_PAIRS[i].5;
+      Dir: dir2 = TUNNEL_PAIRS[i].6;
+    } in
   grid[r1, c1] = (if dir1 == TOP then TUNNEL_T elseif dir1 == DOWN then TUNNEL_D elseif dir1 == LEFT then TUNNEL_L else TUNNEL_R endif) /\
   grid[r2, c2] = (if dir2 == TOP then TUNNEL_T elseif dir2 == DOWN then TUNNEL_D elseif dir2 == LEFT then TUNNEL_L else TUNNEL_R endif) % Tunnels placed with correct orientation.
 );
@@ -56,13 +56,14 @@ constraint forall(r in 1..H, c in 1..W)(
   ->
   sum(d in Dir)(
     let {
-      int: nr = r + dr[d];
-      int: nc = c + dc[d];
+      0..H+1: nr = r + dr[d];
+      0..W+1: nc = c + dc[d];
     } in
     bool2int(
-      nr >= 1 /\ nr <= H /\ nc >= 1 /\ nc <= W /\ 
       can_connect[grid[r, c], d] /\
-      can_connect[grid[nr, nc], opposite[d]] % Neighbors must match connectivity.
+      if nr >= 1 /\ nr <= H /\ nc >= 1 /\ nc <= W then
+        can_connect[grid[nr, nc], opposite[d]] % Neighbors must match connectivity.
+      else false endif
     )
   ) = (if grid[r, c] in SWITCHES_SET then 3 else 2 endif)
 );

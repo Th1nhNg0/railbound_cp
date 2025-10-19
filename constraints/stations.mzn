@@ -41,15 +41,15 @@ array[1..N_TRAINS] of int: train_station_count = [
 constraint if N_STATIONS > 0 then
   forall(st in 1..N_STATIONS)(
     let {
-      int: vehicle_id = STATIONS[st].3;
-      int: station_r = STATIONS[st].1;
-      int: station_c = STATIONS[st].2;
+      1..N_TRAINS: vehicle_id = STATIONS[st].3;
+      1..H: station_r = STATIONS[st].1;
+      1..W: station_c = STATIONS[st].2;
     } in
     forall(time in 0..MAX_TIME)(
       let {
         var bool: vehicle_at_station_now = % Train currently at this station.
             if vehicle_id > 0 then
-                let { int: train_id = vehicle_id; } in
+                let { 1..N_TRAINS: train_id = vehicle_id; } in
                 train_row[train_id, time] = station_r /\ train_col[train_id, time] = station_c
             else false endif;
         var bool: was_visited_before = if time = 0 then false else station_visited_by_time[st, time-1] endif; % Visited before now.
@@ -67,18 +67,18 @@ constraint forall(t in 1..N_TRAINS, time in 0..MAX_TIME) (
     var bool: at_any_station = if num_stations = 0 then false % No stations assigned.
       else exists(s in 1..num_stations where train_station_indices[t, s] > 0)(
         let {
-          int: st_idx = train_station_indices[t, s];
-          int: station_r = STATIONS[st_idx].1;
-          int: station_c = STATIONS[st_idx].2;
+          1..N_STATIONS: st_idx = train_station_indices[t, s];
+          1..H: station_r = STATIONS[st_idx].1;
+          1..W: station_c = STATIONS[st_idx].2;
         } in
         train_row[t, time] = station_r /\ train_col[t, time] = station_c % At any assigned station.
       ) endif;
     var bool: is_first_visit_any = if num_stations = 0 then false % No stations assigned.
       else exists(s in 1..num_stations where train_station_indices[t, s] > 0)(
         let {
-          int: st_idx = train_station_indices[t, s];
-          int: station_r = STATIONS[st_idx].1;
-          int: station_c = STATIONS[st_idx].2;
+          1..N_STATIONS: st_idx = train_station_indices[t, s];
+          1..H: station_r = STATIONS[st_idx].1;
+          1..W: station_c = STATIONS[st_idx].2;
           var bool: at_this_station = (train_row[t, time] = station_r /\ train_col[t, time] = station_c); % At station now.
           var bool: was_visited_before = if time = 0 then false else station_visited_by_time[st_idx, time-1] endif; % Visited before.
         } in
@@ -111,9 +111,9 @@ constraint forall(t in 1..N_TRAINS, time in 0..MAX_TIME) (
 constraint forall(t in 1..N_TRAINS where train_station_count[t] > 0) (
   forall(s in 1..train_station_count[t] where train_station_indices[t, s] > 0)(
     let {
-      int: st_idx = train_station_indices[t, s];
-      int: station_r = STATIONS[st_idx].1;
-      int: station_c = STATIONS[st_idx].2;
+      1..N_STATIONS: st_idx = train_station_indices[t, s];
+      1..H: station_r = STATIONS[st_idx].1;
+      1..W: station_c = STATIONS[st_idx].2;
     } in
     exists(time in 0..MAX_TIME)(
       time < arrival_time[t] /\ % Before arrival at target.
@@ -126,8 +126,8 @@ constraint forall(t in 1..N_TRAINS where train_station_count[t] > 0) (
 % Ensure every station is visited by its assigned train before reaching target.
 constraint forall(st in 1..N_STATIONS)(
   let {
-    int: vehicle_id = STATIONS[st].3;
-    int: train_id = vehicle_id;
+    1..N_TRAINS: vehicle_id = STATIONS[st].3;
+    1..N_TRAINS: train_id = vehicle_id;
   } in
   exists(time in 0..MAX_TIME)(
     time < arrival_time[train_id] /\ % Before arrival at target.

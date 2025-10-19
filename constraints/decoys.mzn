@@ -9,11 +9,19 @@
 % Starting position and first move, considering gate blocking.
 constraint forall(d in 1..N_DECOYS) (
   let {
-    int: r0 = DECOYS[d].1;
-    int: c0 = DECOYS[d].2;
+    1..H: r0 = DECOYS[d].1;
+    1..W: c0 = DECOYS[d].2;
     Dir: dir0 = DECOYS[d].3;
-    int: intended_r = r0 + dr[dir0];
-    int: intended_c = c0 + dc[dir0];
+    0..H+1: raw_intended_r = r0 + dr[dir0];
+    0..W+1: raw_intended_c = c0 + dc[dir0];
+  } in
+  decoy_row[d, 0] = r0 /\
+  decoy_col[d, 0] = c0 /\
+  raw_intended_r >= 1 /\ raw_intended_r <= H /\
+  raw_intended_c >= 1 /\ raw_intended_c <= W /\
+  let {
+    1..H: intended_r = raw_intended_r;
+    1..W: intended_c = raw_intended_c;
     Dir: intended_entry_dir = opposite[dir0];
     var bool: blocked_by_gate = % Check if target is blocked by closed gate.
       if N_GATES >0 /\ cell_has_gate[intended_r, intended_c] then
@@ -25,8 +33,6 @@ constraint forall(d in 1..N_DECOYS) (
       else false endif;
     var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
   } in
-  decoy_row[d, 0] = r0 /\
-  decoy_col[d, 0] = c0 /\
   can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
   if blocked then % Blocked: stay in place.
     decoy_row[d, 1] = r0 /\

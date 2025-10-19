@@ -9,11 +9,19 @@
 % First position (time 0) and first move depend on gate blocking.
 constraint forall(t in 1..N_TRAINS) (
   let {
-    int: r0 = TRAINS[t].1;
-    int: c0 = TRAINS[t].2;
+    1..H: r0 = TRAINS[t].1;
+    1..W: c0 = TRAINS[t].2;
     Dir: dir0 = TRAINS[t].3;
-    int: intended_r = r0 + dr[dir0];
-    int: intended_c = c0 + dc[dir0];
+    0..H+1: raw_intended_r = r0 + dr[dir0];
+    0..W+1: raw_intended_c = c0 + dc[dir0];
+  } in
+  train_row[t, 0] = r0 /\
+  train_col[t, 0] = c0 /\
+  raw_intended_r >= 1 /\ raw_intended_r <= H /\
+  raw_intended_c >= 1 /\ raw_intended_c <= W /\
+  let {
+    1..H: intended_r = raw_intended_r;
+    1..W: intended_c = raw_intended_c;
     Dir: intended_entry_dir = opposite[dir0];
     var bool: blocked_by_gate = % Check if target cell is blocked by closed gate.
       if cell_has_gate[intended_r, intended_c] then
@@ -25,8 +33,6 @@ constraint forall(t in 1..N_TRAINS) (
       else false endif;
     var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
   } in
-  train_row[t, 0] = r0 /\
-  train_col[t, 0] = c0 /\
   can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
   if blocked then
     train_row[t, 1] = r0 /\ % Blocked: stay in place.
