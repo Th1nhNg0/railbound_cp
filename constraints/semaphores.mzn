@@ -21,15 +21,17 @@ function var bool: semaphore_trigger(int: r, int: c, var int: t) =
       can_connect[grid[sr, sc], opposite[d]] /\
       (
         exists(tr in 1..N_TRAINS)(
-          arrival_time[tr] >= t - 1 /\
+          arrival_time[tr] >= t /\
           train_row[tr, t - 1] = sr /\
           train_col[tr, t - 1] = sc /\
-          (train_row[tr, t - 2] != sr \/ train_col[tr, t - 2] != sc)
+          (train_row[tr, t - 2] != sr \/ train_col[tr, t - 2] != sc) /\
+          (train_row[tr, t] != r \/ train_col[tr, t] != c)
         ) \/
         exists(dq in 1..N_DECOYS)(
           decoy_row[dq, t - 1] = sr /\
           decoy_col[dq, t - 1] = sc /\
-          (decoy_row[dq, t - 2] != sr \/ decoy_col[dq, t - 2] != sc)
+          (decoy_row[dq, t - 2] != sr \/ decoy_col[dq, t - 2] != sc) /\
+          (decoy_row[dq, t] != r \/ decoy_col[dq, t] != c)
         )
       )
     )
