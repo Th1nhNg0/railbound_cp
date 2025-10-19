@@ -61,6 +61,29 @@
       .gate-closed {
         background-color: #ff0000;
       }
+      .semaphore-indicator {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 3px solid #000;
+        z-index: 16;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 12px;
+        color: white;
+        text-shadow: 1px 1px 2px black;
+      }
+      .semaphore-open {
+        background-color: #4da6ff;
+      }
+      .semaphore-closed {
+        background-color: #003f88;
+      }
       .activation-indicator {
         position: absolute;
         bottom: 5px;
@@ -308,6 +331,8 @@
         let dswitchToggledStates = [];
         let eswitchToggledStates = [];
         let shouldToggle = [];
+        let semaphorePresent = [];
+        let semaphoreOpenTimeMatrix = [];
         let currentTimeStep = 0;
         let maxTimeStep = 0;
         let timeSliderInUpdate = false;
@@ -682,6 +707,32 @@
                 cell.appendChild(gateDiv);
               }
 
+              // Add semaphores
+              const hasSemaphore =
+                Array.isArray(semaphorePresent?.[row]) &&
+                Boolean(semaphorePresent[row]?.[col]);
+              if (hasSemaphore) {
+                const openTimeValue = Array.isArray(
+                  semaphoreOpenTimeMatrix?.[row]
+                )
+                  ? Number(semaphoreOpenTimeMatrix[row]?.[col] ?? 0)
+                  : 0;
+                const openTime = Number.isFinite(openTimeValue)
+                  ? openTimeValue
+                  : 0;
+                const isOpen =
+                  openTime === 0 ? true : currentTimeStep >= openTime;
+                const semaphoreDiv = document.createElement("div");
+                semaphoreDiv.className = `semaphore-indicator ${
+                  isOpen ? "semaphore-open" : "semaphore-closed"
+                }`;
+                semaphoreDiv.textContent = "S";
+                semaphoreDiv.title = `Semaphore: ${
+                  isOpen ? "Open" : "Closed"
+                }`;
+                cell.appendChild(semaphoreDiv);
+              }
+
               // Add activations
               const activation = activations?.find(
                 ([r, c]) => r === row + 1 && c === col + 1
@@ -782,6 +833,11 @@
           currentGridData = safeParseJSON(data?.grid, null);
           shouldToggle = safeParseJSON(data?.should_toggle, []);
           eswitchToggledStates = safeParseJSON(data?.eswitch_toggled, []);
+          semaphorePresent = safeParseJSON(data?.semaphore_present, []);
+          semaphoreOpenTimeMatrix = safeParseJSON(
+            data?.semaphore_open_time,
+            []
+          );
 
           const rawTrainPaths = safeParseJSON(data?.train_paths, []);
           trainPaths = Array.isArray(rawTrainPaths)
@@ -855,6 +911,22 @@
               })
             : [];
 
+          const maxSemaphoreTime = Array.isArray(semaphoreOpenTimeMatrix)
+            ? semaphoreOpenTimeMatrix.reduce((maxRow, rowStates) => {
+                if (!Array.isArray(rowStates)) {
+                  return maxRow;
+                }
+                const rowMax = rowStates.reduce((maxCell, value) => {
+                  const numeric = Number(value);
+                  if (!Number.isFinite(numeric)) {
+                    return maxCell;
+                  }
+                  return Math.max(maxCell, numeric);
+                }, 0);
+                return Math.max(maxRow, rowMax);
+              }, 0)
+            : 0;
+
           const trainPathLengths = rawTrainPaths.map((p) => p.length);
           const decoyPathLengths = rawDecoyPaths.map((p) => p.length);
 
@@ -863,7 +935,7 @@
           const maxDecoyTime =
             decoyPathLengths.length > 0 ? Math.max(...decoyPathLengths) : 0;
 
-          maxTimeStep = Math.max(maxTrainTime, maxDecoyTime);
+          maxTimeStep = Math.max(maxTrainTime, maxDecoyTime, maxSemaphoreTime);
 
           computeGateStates();
           computeDSwitchStates();

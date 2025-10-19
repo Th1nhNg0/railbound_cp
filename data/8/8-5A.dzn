@@ -31,3 +31,5 @@ STATIONS=[
   (2,3,4),
   (6,3,2),
 ];
+
+SEMAPHORE_SUPPLY=0;

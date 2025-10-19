@@ -1,10 +1,8 @@
 {
     "openFiles": [
-        "main.mzn"
     ],
-    "openTab": 0,
+    "openTab": -1,
     "projectFiles": [
-        "constraints/decoys.mzn",
         "data/1/1-1.dzn",
         "data/1/1-10.dzn",
         "data/1/1-11.dzn",
@@ -122,6 +120,25 @@
         "data/7/7-7C.dzn",
         "data/7/7-8.dzn",
         "data/7/7-9.dzn",
+        "data/9/9-1.dzn",
+        "data/9/9-10.dzn",
+        "data/9/9-10A.dzn",
+        "data/9/9-10B.dzn",
+        "data/9/9-11.dzn",
+        "data/9/9-11A.dzn",
+        "data/9/9-11B.dzn",
+        "data/9/9-2.dzn",
+        "data/9/9-2A.dzn",
+        "data/9/9-3.dzn",
+        "data/9/9-3A.dzn",
+        "data/9/9-4.dzn",
+        "data/9/9-5.dzn",
+        "data/9/9-6.dzn",
+        "data/9/9-7.dzn",
+        "data/9/9-8.dzn",
+        "data/9/9-8A.dzn",
+        "data/9/9-9.dzn",
+        "data/9/9-9A.dzn",
         "main.mzn"
     ],
     "selectedBuiltinConfigId": "org.chuffed.chuffed",

@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
-"""Converts puzzle levels from a legacy JSON format to the MiniZinc `.dzn` format.
+"""Convert legacy Railbound JSON level data to MiniZinc `.dzn` files.
 
-This script reads level data from a `levels.json` file, which was used by a
-previous brute-force solver, and transforms it into the structured `.dzn` data
-files required by the MiniZinc constraint programming model.
+The converter ingests the original `levels.json` dump used by the brute-force
+solver and emits structured `.dzn` files compatible with the constraint model.
+It translates numeric tile IDs, mods, tunnels, stations, and now semaphore
+supplies (including the new `semaphores` field) into the enumerated types the
+MiniZinc model expects.
 
-It handles the mapping of various numeric codes from the JSON to their
-corresponding MiniZinc enumeration types for tracks, switches, tunnels, and
-other game mechanics.
-
-The script can be run to convert all levels or only those that do not yet
-exist in the target `data/` directory.
+You can run it on all levels or only on the ones missing from `data/`.
 
 Usage:
-  python convert_levels.py [--force]
+  python convert_levels.py [--force|-f] [--json-path|-j PATH] [--output-dir|-o DIR] [--level-prefix|-p PREFIX]
 
 Options:
-  --force    Force conversion of all levels, overwriting existing `.dzn` files.
-             By default, the script only converts levels that are missing.
+  --force, -f            Force conversion, overwriting existing `.dzn` files.
+  --json-path, -j PATH   Alternative `levels.json` source.
+  --output-dir, -o DIR   Destination directory for generated `.dzn` files.
+  --level-prefix, -p PREFIX  Restrict conversion to level names starting with this prefix (e.g. `9-`).
 """
 
 import argparse
@@ -116,6 +115,30 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
     mod_nums: List[List[int]] = level_data["mod_nums"]
     cars: List[Dict[str, Any]] = level_data["cars"]
     tracks: int = level_data["tracks"]
+
+    def _extract_semaphore_supply(source: Dict[str, Any]) -> int:
+        """Extract semaphore supply, tolerating legacy keys like 'NUM_SEMAPHORE' and newer 'semaphores'."""
+        for key in (
+            "SEMAPHORE_SUPPLY",
+            "semaphore_supply",
+            "NUM_SEMAPHORE",
+            "NUM_SEMAPHORES",
+            "num_semaphore",
+            "num_semaphores",
+            "semaphores",
+            "semaphore",
+        ):
+            value = source.get(key)
+            if value is not None:
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"Invalid semaphore supply '{value}' for level {level_name} (key='{key}')"
+                    )
+        return 0
+
+    semaphore_supply = _extract_semaphore_supply(level_data)
 
     H = len(board)
     W = len(board[0]) if H > 0 else 0
@@ -229,6 +252,7 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
         "",
         "MAX_TIME=W*H;",
         f"MAX_TRACKS={tracks};",
+        f"SEMAPHORE_SUPPLY={semaphore_supply};",
         "",
         f"TARGET=({target[0]},{target[1]});",
         "",
@@ -318,23 +342,27 @@ Examples:
     )
     parser.add_argument(
         "--force",
+        "-f",
         action="store_true",
         help="Force conversion, overwriting existing .dzn files.",
     )
     parser.add_argument(
         "--json-path",
+        "-j",
         type=Path,
         default="levels.json",
         help="Path to the input levels.json file.",
     )
     parser.add_argument(
         "--output-dir",
+        "-o",
         type=Path,
         default="data",
         help="Directory to save the output .dzn files.",
     )
     parser.add_argument(
         "--level-prefix",
+        "-p",
         type=str,
         help="Only convert levels with names starting with this prefix (e.g., '6-', '7-1').",
     )

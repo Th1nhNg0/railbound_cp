@@ -21,7 +21,8 @@ any: initial_data = (
   gates: [ (GATES[g].1, GATES[g].2, GATES[g].3, GATES[g].4) | g in 1..N_GATES ],
   activations: [ (ACTIVATIONS[a].1, ACTIVATIONS[a].2, ACTIVATIONS[a].3) | a in 1..N_ACTIVATIONS ],
   dswitches: [ (DSWITCHES[ds].1, DSWITCHES[ds].2, DSWITCHES[ds].3) | ds in 1..N_DSWITCHES ],
-  stations: [ (STATIONS[st].1, STATIONS[st].2, STATIONS[st].3) | st in 1..N_STATIONS ]
+  stations: [ (STATIONS[st].1, STATIONS[st].2, STATIONS[st].3) | st in 1..N_STATIONS ],
+  semaphore_supply: SEMAPHORE_SUPPLY
 );
 any: solution_data :: output_only = (
   grid: showJSON(grid),
@@ -46,7 +47,9 @@ any: solution_data :: output_only = (
     endif
   ),
   should_toggle: showJSON(should_toggle),
-  eswitch_toggled: showJSON(eswitch_toggled)
+  eswitch_toggled: showJSON(eswitch_toggled),
+  semaphore_present: showJSON(semaphore_present),
+  semaphore_open_time: showJSON(semaphore_open_time)
 );
 output :: vis_server("viz.html", initial_data) solution_data;
 output [
@@ -93,3 +96,10 @@ output [
     | d in 1..N_DECOYS
   ]
 else [] endif)
+++
+(if SEMAPHORE_SUPPLY > 0 then
+  ["\nSEMAPHORES: "]
+  ++ (if fix(sum(r in 1..H, c in 1..W)(bool2int(semaphore_present[r,c]))) > 0 then
+        [ "  (" ++ show(r) ++ "," ++ show(c) ++ ")\n" | r in 1..H, c in 1..W where fix(semaphore_present[r,c]) ]
+      else [] endif)
+else [] endif);

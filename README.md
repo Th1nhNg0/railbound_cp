@@ -45,7 +45,7 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 
 **Decoys** – Decoy trains are modeled similarly to real cars but are exempt from the completion order, allowing them to circulate or park without interfering with the main objective.
 
-**Semaphores** – A semaphore tile at a three-way junction forces a train to stop before proceeding, synchronizing merges. The model treats this as a mandatory one-step wait on entry with mutual exclusion to prevent simultaneous crossings.
+**Semaphores** – Player-placeable gates that sit on straights or corners adjacent to switches. They start closed, blocking traffic from either side, and automatically flip open forever one timestep after any train (or decoy) enters a connected switch that feeds the guarded track.
 
 **Dual targets** – Some levels require trains to reach two distinct destination locations. Feasibility requires satisfying both targets; the model enforces completion only when all assigned trains have visited both goal tiles in the required order (if any).
 

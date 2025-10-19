@@ -38,3 +38,5 @@ STATIONS=[
   (6,5,2),
   (9,5,1),
 ];
+
+SEMAPHORE_SUPPLY=0;

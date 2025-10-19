@@ -22,6 +22,7 @@ Railbound instances in `data/` are plain-text MiniZinc `.dzn` files. Each file d
 - `W`, `H` - grid width and height.
 - `MAX_TIME` - discrete time horizon. Must be long enough for every train to reach the target.
 - `MAX_TRACKS` - maximum number of non-empty, non-initial cells the solver may fill with new pieces.
+- `SEMAPHORE_SUPPLY` - how many semaphore overlays the player may place. Use `0` if the level does not provide any.
 - `TARGET = (row, col)` - destination cell shared by all trains. The model expects the exit to be on the right edge so trains finish facing `LEFT`.
 
 ## Vehicle Seeds
@@ -51,6 +52,14 @@ Railbound instances in `data/` are plain-text MiniZinc `.dzn` files. Each file d
   - When any train or decoy enters `(row, col)`, every gate or dynamic switch with the matching `activation_id` toggles on the next step.
 - `DSWITCHES = [(row, col, activation_id), ...];`
   - Identifies dynamic switches on the grid and links them to their controlling activation tiles. The piece itself must be pre-seeded in `INIT_POS`.
+
+## Semaphores
+
+Levels that allow the player to place semaphores must set `SEMAPHORE_SUPPLY > 0`. The solver treats semaphores as overlays on straights or corners that touch at least one switch (deterministic, dynamic, or exit-triggered). A placed semaphore behaves like a normally-closed gate:
+
+- Trains and decoys stop on the preceding cell while the semaphore is closed.
+- When any train or decoy enters one of the adjacent switches, the semaphore opens on the following timestep and stays open for the remainder of the run. If no train ever enters a linked switch, the semaphore remains closed throughout the solution.
+- The solver decides which eligible cells receive semaphores, up to the provided `SEMAPHORE_SUPPLY` amount; omit the parameter or set it to `0` when the feature is absent.
 
 ## Stations
 

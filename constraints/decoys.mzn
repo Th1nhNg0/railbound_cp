@@ -19,11 +19,16 @@ constraint forall(d in 1..N_DECOYS) (
       if N_GATES >0 /\ cell_has_gate[intended_r, intended_c] then
         not gate_open[gate_index_at[intended_r, intended_c], 1]
       else false endif;
+    var bool: blocked_by_semaphore =
+      if semaphore_present[intended_r, intended_c] then
+        1 < semaphore_open_time[intended_r, intended_c]
+      else false endif;
+    var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
   } in
   decoy_row[d, 0] = r0 /\
   decoy_col[d, 0] = c0 /\
   can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
-  if blocked_by_gate then % Blocked: stay in place.
+  if blocked then % Blocked: stay in place.
     decoy_row[d, 1] = r0 /\
     decoy_col[d, 1] = c0 /\
     decoy_dir[d, 1] = intended_entry_dir
@@ -52,6 +57,11 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
         var bool: blocked_by_gate = if N_GATES >0 /\ cell_has_gate[intended_r, intended_c] then % Check if blocked.
                 not gate_open[gate_index_at[intended_r, intended_c], time+1]
             else false endif;
+        var bool: blocked_by_semaphore =
+            if semaphore_present[intended_r, intended_c] then
+                time + 1 < semaphore_open_time[intended_r, intended_c]
+            else false endif;
+        var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
         var Piece: effective_piece = % Apply switch state.
             if N_DSWITCHES > 0 /\ cell_has_dswitch[r, c] then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
             elseif N_ESWITCHES > 0 /\ cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
@@ -79,7 +89,7 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
         if (intended_c >= 1 /\ intended_c <= W /\ intended_r >= 1 /\ intended_r <= H /\
             can_enter[grid[intended_r, intended_c], intended_entry_dir] /\ 
             grid[intended_r,intended_c] !=EMPTY /\ 
-            not blocked_by_gate
+            not blocked
         ) then % Valid move: proceed.
                 (next_r, next_c, next_entry_dir) = (intended_r, intended_c, intended_entry_dir)
         else % Invalid move: stay.

@@ -19,11 +19,16 @@ constraint forall(t in 1..N_TRAINS) (
       if cell_has_gate[intended_r, intended_c] then
         not gate_open[gate_index_at[intended_r, intended_c], 1]
       else false endif;
+    var bool: blocked_by_semaphore =
+      if semaphore_present[intended_r, intended_c] then
+        1 < semaphore_open_time[intended_r, intended_c]
+      else false endif;
+    var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
   } in
   train_row[t, 0] = r0 /\
   train_col[t, 0] = c0 /\
   can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
-  if N_GATES>0 /\ blocked_by_gate then
+  if blocked then
     train_row[t, 1] = r0 /\ % Blocked: stay in place.
     train_col[t, 1] = c0 /\
     train_dir[t, 1] = intended_entry_dir
@@ -52,6 +57,11 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
     var bool: blocked_by_gate = if N_GATES>0 /\ cell_has_gate[intended_r, intended_c] then % Check if target is blocked.
         not gate_open[gate_index_at[intended_r, intended_c], time+1]
       else false endif;
+    var bool: blocked_by_semaphore =
+      if semaphore_present[intended_r, intended_c] then
+        time + 1 < semaphore_open_time[intended_r, intended_c]
+      else false endif;
+    var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
     var Piece: effective_piece = % Apply switch state to get actual routing.
       if N_DSWITCHES > 0 /\ cell_has_dswitch[r, c] then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
       elseif N_ESWITCHES > 0 /\ cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
@@ -77,9 +87,9 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
        intended_r = r + dr[exit_dir] /\
        intended_c = c + dc[exit_dir] /\
        intended_entry_dir = opposite[exit_dir]
-     endif) /\
+    endif) /\
     can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
-    if blocked_by_gate then % Blocked by gate: stay.
+    if blocked then % Blocked by gate or semaphore: stay.
       next_r = r /\
       next_c = c /\
       next_entry_dir = entry_dir

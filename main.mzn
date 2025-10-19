@@ -23,6 +23,7 @@ array[int] of tuple(int, int, int, bool): GATES; % Gates: (row, col, activation_
 array[int] of tuple(int, int, int): ACTIVATIONS; % Activation cells: (row, col, activation_id).
 array[int] of tuple(int, int, int): DSWITCHES; % Dynamic switches: (row, col, activation_id).
 array[int] of tuple(int, int, int): STATIONS; % Stations: (row, col, train_id).
+int: SEMAPHORE_SUPPLY; % Available semaphore placements the player can use.
 
 % ==== DERIVED COUNTS (computed from input) ====
 int: N_TRAINS = length(TRAINS);          % Number of player trains to solve for.
@@ -34,7 +35,6 @@ int: N_ACTIVATIONS = length(ACTIVATIONS); % Number of activation tiles.
 int: N_DSWITCHES = length(DSWITCHES);    % Number of dynamic switches.
 int: N_STATIONS = length(STATIONS);      % Number of stations.
 int: N_ESWITCHES = sum(i in 1..N_INIT_POS)(bool2int(INIT_POS[i].3 in ESWITCHES_SET)); % Number of exit-triggered switches.
-
 include "lib/globals.mzn";
 
 % ==== DECISION VARIABLES ====
@@ -57,6 +57,8 @@ array[1..N_DECOYS, 1..MAX_TIME] of var Dir: decoy_dir;      % Direction decoy en
 array[1..N_GATES, 0..MAX_TIME] of var bool: gate_open;      % Gate state over time (true=open, false=closed).
 array[1..N_DSWITCHES, 0..MAX_TIME] of var bool: dswitch_toggled; % Dswitch toggle state (false=original, true=toggled).
 array[1..N_ESWITCHES, 0..MAX_TIME] of var bool: eswitch_toggled; % Eswitch toggle state (false=original, true=toggled).
+array[1..H, 1..W] of var bool: semaphore_present;           % Whether a semaphore is placed on a cell.
+array[1..H, 1..W] of var 0..(MAX_TIME + 1): semaphore_open_time; % 0=no semaphore, MAX_TIME+1=never opens.
 
 % ============================================================
 % CONSTRAINTS
@@ -67,6 +69,7 @@ include "constraints/trains.mzn";
 include "constraints/decoys.mzn";
 include "constraints/activations.mzn";
 include "constraints/eswitches.mzn";
+include "constraints/semaphores.mzn";
 include "constraints/stations.mzn";
 
 

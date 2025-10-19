@@ -69,6 +69,8 @@ set of Piece: ESWITCHES_SET = {
   ESWITCH_R_L_T, ESWITCH_R_L_D, ESWITCH_L_R_T, ESWITCH_L_R_D
 };
 set of Piece: TUNNELS_SET = { TUNNEL_T, TUNNEL_R, TUNNEL_D, TUNNEL_L };
+set of Piece: SWITCH_VARIANTS_SET = SWITCHES_SET union DSWITCHES_SET union ESWITCHES_SET;
+set of Piece: SEMAPHORE_ELIGIBLE_SET = STRAIGHTS_SET union CORNERS_SET;
 
 % Pieces that cannot be placed dynamically (must be pre-placed in INIT_POS).
 set of Piece: UNPLACEABLE_PIECES = DSWITCHES_SET union ESWITCHES_SET union TUNNELS_SET union { ROCK };
