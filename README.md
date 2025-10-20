@@ -7,8 +7,8 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 ## Solver Coverage
 
 - 12 main-line levels are tracked in this project.
-- Levels 1–8 are currently solved automatically; levels 9–12 are work in progress.
-- Instances for solved levels live in `data/levels/` as ready-to-run MiniZinc data files.
+- Levels 1–9 are currently solved automatically; levels 10–12 are work in progress.
+- Instances for solved levels live in `data/` as ready-to-run MiniZinc data files.
 
 ![Gameplay Preview](docs/game.gif)
 
@@ -24,7 +24,7 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 | 6     | Exit-triggered switches (`ESWITCH`)         | ✅ solved     |
 | 7     | Decoy cars that must be delayed or rerouted | ✅ solved     |
 | 8     | Large-grid search stress test               | ✅ solved     |
-| 9     | Semaphores (three-way stop tile)            | ⏳ modeling   |
+| 9     | Semaphores (three-way stop tile)            | ✅ solved     |
 | 10    | Semaphores (three-way stop tile)            | ⏳ modeling   |
 | 11    | Two target locations (dual goals)           | ⏳ modeling   |
 | 12    | Two target locations (dual goals)           | ⏳ modeling   |

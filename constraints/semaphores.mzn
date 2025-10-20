@@ -7,8 +7,8 @@
 % remaining open for the rest of the run.
 % ============================================================
 
-function var bool: semaphore_trigger(1..H: r, 1..W: c, var 0..(MAX_TIME + 1): t) =
-  if t < 2 then false
+function var bool: semaphore_trigger(1..H: r, 1..W: c, var 0..(MAX_TIME + 1): t) :: cache_result =
+  if t < 2 \/ t > MAX_TIME then false
   else
     exists(d in Dir)(
       let {
@@ -16,26 +16,25 @@ function var bool: semaphore_trigger(1..H: r, 1..W: c, var 0..(MAX_TIME + 1): t)
         0..W+1: sc = c + dc[d];
       } in
       can_connect[grid[r, c], d] /\
+      sr >= 1 /\ sr <= H /\ sc >= 1 /\ sc <= W /\
+      grid[sr, sc] in SWITCH_VARIANTS_SET /\
+      can_connect[grid[sr, sc], opposite[d]] /\
       (
-        if sr >= 1 /\ sr <= H /\ sc >= 1 /\ sc <= W then
-          grid[sr, sc] in SWITCH_VARIANTS_SET /\
-          can_connect[grid[sr, sc], opposite[d]] /\
-          (
-            exists(tr in 1..N_TRAINS)(
-              arrival_time[tr] >= t /\
-              train_row[tr, t - 1] = sr /\
-              train_col[tr, t - 1] = sc /\
-              (train_row[tr, t - 2] != sr \/ train_col[tr, t - 2] != sc) /\
-              (train_row[tr, t] != r \/ train_col[tr, t] != c)
-            ) \/
-            exists(dq in 1..N_DECOYS)(
-              decoy_row[dq, t - 1] = sr /\
-              decoy_col[dq, t - 1] = sc /\
+        exists(tr in 1..N_TRAINS where
+          arrival_time[tr] >= t /\
+          train_row[tr, t - 1] = sr /\
+          train_col[tr, t - 1] = sc)(
+            (train_row[tr, t - 2] != sr \/ train_col[tr, t - 2] != sc) /\
+            (train_row[tr, t] != r \/ train_col[tr, t] != c)
+        ) \/
+        (if N_DECOYS = 0 then false else
+          exists(dq in 1..N_DECOYS where
+            decoy_row[dq, t - 1] = sr /\
+            decoy_col[dq, t - 1] = sc)(
               (decoy_row[dq, t - 2] != sr \/ decoy_col[dq, t - 2] != sc) /\
               (decoy_row[dq, t] != r \/ decoy_col[dq, t] != c)
-            )
           )
-        else false endif
+        endif)
       )
     )
   endif;
@@ -60,6 +59,43 @@ constraint SEMAPHORE_SUPPLY = 0 -> forall(r in 1..H, c in 1..W)(not semaphore_pr
 % Each semaphore slot is either unused (0,0) or references a valid cell pair.
 constraint forall(s in SEMAPHORE_SLOTS)(
   (semaphore_place_row[s] = 0) <-> (semaphore_place_col[s] = 0)
+);
+
+% ==== SLOT ↔ GRID CHANNELLING ====
+% Tie slot coordinates directly to grid semantics to improve propagation.
+constraint forall(s in SEMAPHORE_SLOTS)(
+  if semaphore_place_row[s] = 0 then
+    semaphore_slot_open_time[s] = 0
+  else
+    let {
+      var 0..H: r0 = semaphore_place_row[s];
+      var 0..W: c0 = semaphore_place_col[s];
+    } in
+      r0 >= 1 /\
+      c0 >= 1 /\
+      semaphore_slot_open_time[s] >= 2 /\
+      semaphore_slot_open_time[s] <= MAX_TIME + 1 /\
+      semaphore_present[r0, c0] /\
+      semaphore_slot_open_time[s] = semaphore_open_time[r0, c0] /\
+      grid[r0, c0] in SEMAPHORE_ELIGIBLE_SET /\
+      (N_GATES = 0 \/ not cell_has_gate[r0, c0]) /\
+      (if N_ACTIVATIONS = 0 then true else
+        forall(a in 1..N_ACTIVATIONS)(
+          ACTIVATIONS[a].1 != r0 \/ ACTIVATIONS[a].2 != c0
+        )
+      endif) /\
+      exists(d in Dir)(
+        let {
+          var 0..H+1: sr = r0 + dr[d];
+          var 0..W+1: sc = c0 + dc[d];
+        } in
+        if sr >= 1 /\ sr <= H /\ sc >= 1 /\ sc <= W then
+          can_connect[grid[r0, c0], d] /\
+          grid[sr, sc] in SWITCH_VARIANTS_SET /\
+          can_connect[grid[sr, sc], opposite[d]]
+        else false endif
+      )
+  endif
 );
 
 % Prevent placing more than one semaphore on the same cell.
@@ -87,30 +123,6 @@ constraint forall(s in SEMAPHORE_SLOTS)(
   semaphore_place_row[s] != 0 ->
     semaphore_slot_open_time[s] >= 2 /\
     semaphore_slot_open_time[s] <= MAX_TIME + 1
-);
-
-% ==== VALID PLACEMENT RULES ====
-% Semaphores may only be placed on straights or corners that connect to at least one switch variant.
-constraint forall(r in 1..H, c in 1..W)(
-  semaphore_present[r, c] ->
-    grid[r, c] in SEMAPHORE_ELIGIBLE_SET /\
-    (N_GATES = 0 \/ not cell_has_gate[r, c]) /\
-    (if N_ACTIVATIONS = 0 then true else
-      forall(a in 1..N_ACTIVATIONS)(
-        ACTIVATIONS[a].1 != r \/ ACTIVATIONS[a].2 != c
-      )
-    endif) /\
-    exists(d in Dir)(
-      let {
-        0..H+1: sr = r + dr[d];
-        0..W+1: sc = c + dc[d];
-      } in
-      if sr >= 1 /\ sr <= H /\ sc >= 1 /\ sc <= W then
-        can_connect[grid[r, c], d] /\
-        grid[sr, sc] in SWITCH_VARIANTS_SET /\
-        can_connect[grid[sr, sc], opposite[d]]
-      else false endif
-    )
 );
 
 % ==== BASE STATE ====
