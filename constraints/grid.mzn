@@ -35,10 +35,11 @@ constraint forall(i in 1..N_TUNNELS)(
   grid[r2, c2] = (if dir2 == TOP then TUNNEL_T elseif dir2 == DOWN then TUNNEL_D elseif dir2 == LEFT then TUNNEL_L else TUNNEL_R endif) % Tunnels placed with correct orientation.
 );
 
-% ==== SPECIAL PIECES MUST BE PRE-PLACED ====
-% Dswitches, Eswitches, and Tunnels cannot be placed dynamically.
-constraint forall(r in 1..H, c in 1..W)(
-    (grid[r, c] in UNPLACEABLE_PIECES)-> cell_is_init[r, c] % Only pre-placed allowed.
+% ==== DOMAIN TIGHTENING FOR FREE CELLS ====
+% Non-init cells can only hold placeable pieces (EMPTY, straights, corners, switches).
+% This directly restricts domains from 37 to 15 values, improving search and propagation.
+constraint forall(r in 1..H, c in 1..W where not cell_is_init[r, c])(
+    grid[r, c] in PLACEABLE_SET
 );
 
 % ==== TRAIN PATH VALIDITY ====
