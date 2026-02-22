@@ -75,5 +75,8 @@ set of Piece: SEMAPHORE_ELIGIBLE_SET = STRAIGHTS_SET union CORNERS_SET;
 % Pieces that cannot be placed dynamically (must be pre-placed in INIT_POS).
 set of Piece: UNPLACEABLE_PIECES = DSWITCHES_SET union ESWITCHES_SET union TUNNELS_SET union { ROCK };
 
+% Pieces that can be placed dynamically by the solver in free cells.
+set of Piece: PLACEABLE_SET = {EMPTY} union STRAIGHTS_SET union CORNERS_SET union SWITCHES_SET;
+
 % ==== TYPE ALIASES ====
 type Pos = tuple(int, int, Piece); % Position tuple: (row, col, piece_type).
