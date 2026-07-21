@@ -14,15 +14,14 @@ set of int: ACTIVATION_IDS = if MAX_ID = 0 then {} else 1..MAX_ID endif;
 array[ACTIVATION_IDS, 0..MAX_TIME] of var bool: should_toggle;
 
 % ==== INITIAL TOGGLE STATE ====
-% No toggles at time 0 or 1 (before any train can activate).
+% No toggles at time 0.
 constraint forall(a in ACTIVATION_IDS)(
-    should_toggle[a, 0] = false /\
-    should_toggle[a, 1] = false
+    should_toggle[a, 0] = false
 );
 
 % ==== DETERMINE TOGGLE AT EACH TIMESTEP ====
 % Toggle occurs when odd number of trains/decoys newly enter the activation cell.
-constraint forall(a in ACTIVATION_IDS, t in 2..MAX_TIME)(
+constraint forall(a in ACTIVATION_IDS, t in 1..MAX_TIME)(
     should_toggle[a, t] = ((sum(
         act in 1..N_ACTIVATIONS where ACTIVATIONS[act].3 = a
     )(
@@ -30,13 +29,13 @@ constraint forall(a in ACTIVATION_IDS, t in 2..MAX_TIME)(
             bool2int(
                 train_row[tr, t - 1] = ACTIVATIONS[act].1 /\ % At activation cell now.
                 train_col[tr, t - 1] = ACTIVATIONS[act].2 /\
-                (train_row[tr, t - 2] != ACTIVATIONS[act].1 \/ train_col[tr, t - 2] != ACTIVATIONS[act].2) % But not before.
+                (t = 1 \/ train_row[tr, max(0, t - 2)] != ACTIVATIONS[act].1 \/ train_col[tr, max(0, t - 2)] != ACTIVATIONS[act].2) % But not before.
             )
         ) + sum(d in 1..N_DECOYS)(
             bool2int(
                 decoy_row[d, t - 1] = ACTIVATIONS[act].1 /\ % At activation cell now.
                 decoy_col[d, t - 1] = ACTIVATIONS[act].2 /\
-                (decoy_row[d, t - 2] != ACTIVATIONS[act].1 \/ decoy_col[d, t - 2] != ACTIVATIONS[act].2) % But not before.
+                (t = 1 \/ decoy_row[d, max(0, t - 2)] != ACTIVATIONS[act].1 \/ decoy_col[d, max(0, t - 2)] != ACTIVATIONS[act].2) % But not before.
             )
         )
     )) mod 2 = 1) % Odd number = toggle.

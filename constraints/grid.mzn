@@ -50,9 +50,10 @@ constraint forall(t in 1..N_TRAINS, i in 1..arrival_time[t])(
 );
 
 % ==== CONNECTIVITY CONSTRAINT ====
-% Manually placed switches must have 3 neighbors; corners must have 2.
+% Manually placed pieces must connect to neighbors (preventing floating tracks).
+% Allows dead-ends (useful for decoy parking): switches require >= 2 connections; corners and straights >= 1.
 constraint forall(r in 1..H, c in 1..W)(
-  (((grid[r, c] in SWITCHES_SET) \/ (grid[r, c] in CORNERS_SET)) /\
+  (((grid[r, c] in SWITCHES_SET) \/ (grid[r, c] in CORNERS_SET) \/ (grid[r, c] in STRAIGHTS_SET)) /\
   not cell_is_init[r, c]) % Only if manually placed.
   ->
   sum(d in Dir)(
@@ -66,7 +67,7 @@ constraint forall(r in 1..H, c in 1..W)(
         can_connect[grid[nr, nc], opposite[d]] % Neighbors must match connectivity.
       else false endif
     )
-  ) = (if grid[r, c] in SWITCHES_SET then 3 else 2 endif)
+  ) >= (if grid[r, c] in SWITCHES_SET then 2 else 1 endif)
 );
 
 % ==== PLACED PIECE USAGE CONSTRAINT ====

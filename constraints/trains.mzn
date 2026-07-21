@@ -138,3 +138,5 @@ constraint forall(t1 in 1..N_TRAINS-1, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-
     (tunnel_dest_row[train_row[t2, i], train_col[t2, i]] != train_row[t1, i+1] \/
      tunnel_dest_col[train_row[t2, i], train_col[t2, i]] != train_col[t1, i+1]) % t2 did not move to t1's position.
 );
+
+

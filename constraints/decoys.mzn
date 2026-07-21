@@ -74,32 +74,39 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
             else piece endif;
     } in
 
-    if piece = EMPTY then % On empty cell: stay.
+    let {
+        var bool: waiting = if N_STATIONS = 0 then false else decoy_station_wait_time[d, time] > 0 endif;
+    } in
+    if waiting then % Wait at station: don't move.
         (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
     else
-        (if piece in TUNNELS_SET then % Tunnel: teleport to exit.
-                 let {
-                         var 1..H: dest_r = tunnel_dest_row[r, c];
-                         var 1..W: dest_c = tunnel_dest_col[r, c];
-                         var Dir: dest_exit_dir_enum = to_enum(Dir, tunnel_exit_dir[r, c]);
-                 } in
-                 intended_r = dest_r + dr[dest_exit_dir_enum] /\
-                 intended_c = dest_c + dc[dest_exit_dir_enum] /\
-                 intended_entry_dir = opposite[dest_exit_dir_enum]
-         else % Normal track: follow routing.
-                 exit_dir = exit_of[effective_piece, entry_dir] /\
-                 intended_r = r + dr[exit_dir] /\
-                 intended_c = c + dc[exit_dir] /\
-                 intended_entry_dir = opposite[exit_dir]
-         endif) /\
-        if (intended_c >= 1 /\ intended_c <= W /\ intended_r >= 1 /\ intended_r <= H /\
-            can_enter[grid[intended_r, intended_c], intended_entry_dir] /\ 
-            grid[intended_r,intended_c] !=EMPTY /\ 
-            not blocked
-        ) then % Valid move: proceed.
-                (next_r, next_c, next_entry_dir) = (intended_r, intended_c, intended_entry_dir)
-        else % Invalid move: stay.
-                (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
+        if piece = EMPTY then % On empty cell: stay.
+            (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
+        else
+            (if piece in TUNNELS_SET then % Tunnel: teleport to exit.
+                     let {
+                             var 1..H: dest_r = tunnel_dest_row[r, c];
+                             var 1..W: dest_c = tunnel_dest_col[r, c];
+                             var Dir: dest_exit_dir_enum = to_enum(Dir, tunnel_exit_dir[r, c]);
+                     } in
+                     intended_r = dest_r + dr[dest_exit_dir_enum] /\
+                     intended_c = dest_c + dc[dest_exit_dir_enum] /\
+                     intended_entry_dir = opposite[dest_exit_dir_enum]
+             else % Normal track: follow routing.
+                     exit_dir = exit_of[effective_piece, entry_dir] /\
+                     intended_r = r + dr[exit_dir] /\
+                     intended_c = c + dc[exit_dir] /\
+                     intended_entry_dir = opposite[exit_dir]
+             endif) /\
+            if (intended_c >= 1 /\ intended_c <= W /\ intended_r >= 1 /\ intended_r <= H /\
+                can_enter[grid[intended_r, intended_c], intended_entry_dir] /\ 
+                grid[intended_r,intended_c] !=EMPTY /\ 
+                not blocked
+            ) then % Valid move: proceed.
+                    (next_r, next_c, next_entry_dir) = (intended_r, intended_c, intended_entry_dir)
+            else % Invalid move: stay.
+                    (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
+            endif
         endif
     endif
 );
@@ -139,3 +146,5 @@ constraint forall(d in 1..N_DECOYS, t in 1..N_TRAINS, i in 1..MAX_TIME-1 where i
     (tunnel_dest_row[train_row[t, i], train_col[t, i]] != decoy_row[d, i+1] \/
      tunnel_dest_col[train_row[t, i], train_col[t, i]] != decoy_col[d, i+1]) % t did not move to d's position.
 );
+
+

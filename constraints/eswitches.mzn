@@ -24,6 +24,7 @@ constraint if N_ESWITCHES > 0 then
                 bool2int(
                     train_row[tr, t - 1] = ESWITCHES_DERIVED[es].1 /\ % At eswitch cell now.
                     train_col[tr, t - 1] = ESWITCHES_DERIVED[es].2 /\
+                    (train_row[tr, t] != ESWITCHES_DERIVED[es].1 \/ train_col[tr, t] != ESWITCHES_DERIVED[es].2) /\ % Different cell next.
                     (train_row[tr, t-2] != ESWITCHES_DERIVED[es].1 \/ train_col[tr, t-2] != ESWITCHES_DERIVED[es].2) % Different cell before.
                 )
             ) + sum(d in 1..N_DECOYS)(
