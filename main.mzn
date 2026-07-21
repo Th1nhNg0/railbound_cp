@@ -5,8 +5,6 @@
 % and all puzzle mechanics (gates, switches, stations, tunnels, activations).
 % Solves Railbound puzzle levels by finding valid track placements and routes.
 % ============================================================
-
-include "globals.mzn";
 include "lib/types.mzn";
 
 % ==== INPUT PARAMETERS (from puzzle data file) ====
