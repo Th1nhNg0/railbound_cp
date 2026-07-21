@@ -8,6 +8,11 @@
 # statistics, determines the outcome (e.g., SUCCESS, TIMEOUT), and generates
 # a detailed CSV report.
 #
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
+
 # Key Features:
 # - Run benchmarks on all or a specified subset of level directories.
 # - Customizable solver, time limit, and parallel threads.
