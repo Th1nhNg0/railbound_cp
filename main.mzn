@@ -44,42 +44,22 @@ array[1..H, 1..W] of var Piece: grid; % Grid cells contain track pieces (straigh
 array[1..N_TRAINS, 0..MAX_TIME] of var 1..H: train_row;     % Train row position over time.
 array[1..N_TRAINS, 0..MAX_TIME] of var 1..W: train_col;     % Train column position over time.
 array[1..N_TRAINS, 1..MAX_TIME] of var Dir: train_dir;      % Direction train enters each cell.
-% arrival_time: statically fixed when ARRIVAL_DOMAIN has exactly 1 value, else var.
-array[1..N_TRAINS] of var int: arrival_time = [
-  if card(ARRIVAL_DOMAIN[t]) = 1 then min(ARRIVAL_DOMAIN[t])
-  else (let { var min(ARRIVAL_DOMAIN[t])..max(ARRIVAL_DOMAIN[t]): v; } in v)
-  endif
-| t in 1..N_TRAINS];
+% Arrival bounds must remain independent of geometric distance: a tunnel can
+% move a train farther than its Manhattan distance permits in one timestep.
+array[1..N_TRAINS] of var 1..MAX_TIME: arrival_time;
 
 % Decoy Movement: Position and direction of each decoy train (obstacle to avoid).
-set of int: DECOY_INDICES = if N_DECOYS = 0 then {} else 1..N_DECOYS endif;
-set of int: TIME_SET_DECOYS_0 = if N_DECOYS = 0 then {} else 0..MAX_TIME endif;
-set of int: TIME_SET_DECOYS_1 = if N_DECOYS = 0 then {} else 1..MAX_TIME endif;
-array[DECOY_INDICES, TIME_SET_DECOYS_0] of var 1..H: decoy_row;
-array[DECOY_INDICES, TIME_SET_DECOYS_0] of var 1..W: decoy_col;
-array[DECOY_INDICES, TIME_SET_DECOYS_1] of var Dir: decoy_dir;
-
-% 1D Cell Index variables for trains and decoys.
-array[1..N_TRAINS, 0..MAX_TIME] of var 1..(H*W): train_cell;
-constraint forall(t in 1..N_TRAINS, i in 0..MAX_TIME)(
-  train_cell[t, i] = (train_row[t, i] - 1) * W + train_col[t, i]
-);
-
-array[DECOY_INDICES, TIME_SET_DECOYS_0] of var 1..(H*W): decoy_cell;
-constraint forall(d in DECOY_INDICES, i in TIME_SET_DECOYS_0)(
-  decoy_cell[d, i] = (decoy_row[d, i] - 1) * W + decoy_col[d, i]
-);
+array[1..N_DECOYS, 0..MAX_TIME] of var 1..H: decoy_row;
+array[1..N_DECOYS, 0..MAX_TIME] of var 1..W: decoy_col;
+array[1..N_DECOYS, 1..MAX_TIME] of var Dir: decoy_dir;
 
 % Gate/Switch State: Toggle states for gates, dynamic switches, and exit-triggered switches.
 set of int: GATE_INDICES = if N_GATES = 0 then {} else 1..N_GATES endif;
 set of int: DSWITCH_INDICES = if N_DSWITCHES = 0 then {} else 1..N_DSWITCHES endif;
 set of int: ESWITCH_INDICES = if N_ESWITCHES = 0 then {} else 1..N_ESWITCHES endif;
-set of int: TIME_SET_GATES = if N_GATES = 0 then {} else 0..MAX_TIME endif;
-set of int: TIME_SET_DSWITCHES = if N_DSWITCHES = 0 then {} else 0..MAX_TIME endif;
-set of int: TIME_SET_ESWITCHES = if N_ESWITCHES = 0 then {} else 0..MAX_TIME endif;
-array[GATE_INDICES, TIME_SET_GATES] of var bool: gate_open;
-array[DSWITCH_INDICES, TIME_SET_DSWITCHES] of var bool: dswitch_toggled;
-array[ESWITCH_INDICES, TIME_SET_ESWITCHES] of var bool: eswitch_toggled;
+array[GATE_INDICES, 0..MAX_TIME] of var bool: gate_open;
+array[DSWITCH_INDICES, 0..MAX_TIME] of var bool: dswitch_toggled;
+array[ESWITCH_INDICES, 0..MAX_TIME] of var bool: eswitch_toggled;
 
 
 % Semaphore Placement: Direct presence indicator and opening time per cell.
@@ -101,6 +81,6 @@ include "constraints/eswitches.mzn";
 include "constraints/semaphores.mzn";
 include "constraints/stations.mzn";
 
-solve :: int_search(grid, dom_w_deg, indomain_min) satisfy;
+solve satisfy;
 
 include "formatting.mzn";

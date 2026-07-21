@@ -48,7 +48,7 @@ constraint forall(t in 1..N_TRAINS) (
 
 % ==== TRAIN MOVEMENT ====
 % Movement based on current track piece, handling tunnels, gates, stations, and switches.
-constraint forall(t in 1..N_TRAINS, time in 1..(MAX_ARRIVAL[t] - 1) where time < arrival_time[t]) (
+constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_time[t]) (
   let {
     var 1..H: r = train_row[t, time];
     var 1..W: c = train_col[t, time];
@@ -119,7 +119,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..(MAX_ARRIVAL[t] - 1) where time <
 
 % ==== TRAIN ARRIVAL CONSTRAINT ====
 % Once arrived at target, train stays there for all future timesteps.
-constraint forall(t in 1..N_TRAINS, time in 1..MAX_ARRIVAL[t] where time >= arrival_time[t]) (
+constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME where time >= arrival_time[t]) (
     train_row[t, time] = TARGET.1 /\
     train_col[t, time] = TARGET.2 /\
     train_dir[t, time] = LEFT % Assumed arrival orientation.
@@ -133,43 +133,18 @@ constraint forall(t in 1..N_TRAINS-1) (
 
 % ==== NO TRAIN COLLISIONS ====
 % No two trains occupy the same cell at the same time (before either arrives).
-constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_ARRIVAL[t1])(
-    train_cell[t1, i] != train_cell[t2, i] \/ i >= arrival_time[t1]
+constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME where i < arrival_time[t1])(
+    train_row[t1, i] != train_row[t2, i] \/ train_col[t1, i] != train_col[t2, i]
 );
 
 % ==== NO POSITION SWAPS ====
 % Trains cannot swap positions between consecutive timesteps (including tunnels).
-constraint forall(t1 in 1..N_TRAINS-1, t2 in t1 + 1..N_TRAINS, i in 1..(MAX_ARRIVAL[t1] - 1))(
-    (if N_TUNNELS = 0 then train_cell[t1, i] else tunnel_dest_cell[train_cell[t1, i]] endif) != train_cell[t2, i+1] \/
-    (if N_TUNNELS = 0 then train_cell[t2, i] else tunnel_dest_cell[train_cell[t2, i]] endif) != train_cell[t1, i+1] \/
-    i >= arrival_time[t1]
+constraint forall(t1 in 1..N_TRAINS-1, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1 where i < arrival_time[t1])(
+    (tunnel_dest_row[train_row[t1, i], train_col[t1, i]] != train_row[t2, i+1] \/
+     tunnel_dest_col[train_row[t1, i], train_col[t1, i]] != train_col[t2, i+1]) \/
+    (tunnel_dest_row[train_row[t2, i], train_col[t2, i]] != train_row[t1, i+1] \/
+     tunnel_dest_col[train_row[t2, i], train_col[t2, i]] != train_col[t1, i+1])
 );
 
-% ==== REACHABILITY CONES ====
-% A train can be at most 'time' steps away from its start position.
-constraint forall(t in 1..N_TRAINS, time in 0..MAX_ARRIVAL[t])(
-  abs(train_row[t, time] - TRAINS[t].1) + abs(train_col[t, time] - TRAINS[t].2) <= time
-);
-
-% A train must be close enough to target to reach it by arrival_time[t].
-constraint forall(t in 1..N_TRAINS, time in 0..MAX_ARRIVAL[t] where time < arrival_time[t])(
-  abs(train_row[t, time] - TARGET.1) + abs(train_col[t, time] - TARGET.2) <= arrival_time[t] - time
-);
-
-% ==== STATIC PARITY-FILTERED ARRIVAL TIME DOMAINS ====
-% arrival_time[t] must have correct parity AND be within [MIN_ARRIVAL[t], MAX_ARRIVAL[t]].
-% Express this as a set membership constraint to eliminate int_mod at runtime.
-array[1..N_TRAINS] of set of int: ARRIVAL_DOMAIN = [
-  { v | v in MIN_ARRIVAL[t]..MAX_ARRIVAL[t] where v mod 2 = TRAIN_DIST[t] mod 2 }
-| t in 1..N_TRAINS];
-
-constraint forall(t in 1..N_TRAINS)(
-  arrival_time[t] in ARRIVAL_DOMAIN[t]
-);
-
-% ==== PARITY-AWARE SEQUENTIAL ARRIVAL INCREMENT ====
-constraint forall(t in 1..N_TRAINS-1)(
-  arrival_time[t+1] >= arrival_time[t] + MIN_STEP_BETWEEN[t]
-);
 
 

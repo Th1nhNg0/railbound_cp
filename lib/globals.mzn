@@ -352,21 +352,3 @@ function var Piece: dswitch_effective_piece(var Piece: base_piece, var bool: tog
 function var Piece: eswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
   if toggled then eswitch_toggle[base_piece] else base_piece endif; % Returns toggled or original piece.
 
-% ==== STATIC BOUNDS ON ARRIVAL TIME (FORWARD & BACKWARD PASSES) ====
-array[1..N_TRAINS] of int: TRAIN_DIST = [
-  abs(TRAINS[t].1 - TARGET.1) + abs(TRAINS[t].2 - TARGET.2)
-| t in 1..N_TRAINS];
-
-array[1..N_TRAINS] of int: MIN_STEP_BETWEEN = [
-  if t < N_TRAINS then
-    if (TRAIN_DIST[t] mod 2) == (TRAIN_DIST[t+1] mod 2) then 2 else 1 endif
-  else 0 endif
-| t in 1..N_TRAINS];
-
-array[1..N_TRAINS] of int: MIN_ARRIVAL = [
-  max([ TRAIN_DIST[k] + sum(j in k..t-1)(MIN_STEP_BETWEEN[j]) | k in 1..t ])
-| t in 1..N_TRAINS];
-
-array[1..N_TRAINS] of int: MAX_ARRIVAL = [
-  MAX_TIME - sum(j in t..N_TRAINS-1)(MIN_STEP_BETWEEN[j])
-| t in 1..N_TRAINS];
