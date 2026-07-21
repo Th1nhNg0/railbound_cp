@@ -24,11 +24,12 @@ constraint forall(t in 1..N_TRAINS) (
     1..W: intended_c = raw_intended_c;
     Dir: intended_entry_dir = opposite[dir0];
     var bool: blocked_by_gate = % Check if target cell is blocked by closed gate.
-      if cell_has_gate[intended_r, intended_c] then
+      if N_GATES = 0 then false
+      elseif cell_has_gate[intended_r, intended_c] then
         not gate_open[gate_index_at[intended_r, intended_c], 1]
       else false endif;
     var bool: blocked_by_semaphore =
-      if semaphore_present[intended_r, intended_c] then
+      if SEMAPHORE_SUPPLY > 0 /\ semaphore_present[intended_r, intended_c] then
         1 < semaphore_open_time[intended_r, intended_c]
       else false endif;
     var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
@@ -47,7 +48,7 @@ constraint forall(t in 1..N_TRAINS) (
 
 % ==== TRAIN MOVEMENT ====
 % Movement based on current track piece, handling tunnels, gates, stations, and switches.
-constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_time[t]) (
+constraint forall(t in 1..N_TRAINS, time in 1..(MAX_ARRIVAL[t] - 1) where time < arrival_time[t]) (
   let {
     var 1..H: r = train_row[t, time];
     var 1..W: c = train_col[t, time];
@@ -60,17 +61,23 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
     var 1..H: intended_r;
     var 1..W: intended_c;
     var Dir: intended_entry_dir;
-    var bool: blocked_by_gate = if N_GATES>0 /\ cell_has_gate[intended_r, intended_c] then % Check if target is blocked.
+    var bool: blocked_by_gate = if N_GATES = 0 then false
+      elseif cell_has_gate[intended_r, intended_c] then % Check if target is blocked.
         not gate_open[gate_index_at[intended_r, intended_c], time+1]
       else false endif;
     var bool: blocked_by_semaphore =
-      if semaphore_present[intended_r, intended_c] then
+      if SEMAPHORE_SUPPLY > 0 /\ semaphore_present[intended_r, intended_c] then
         time + 1 < semaphore_open_time[intended_r, intended_c]
       else false endif;
     var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
     var Piece: effective_piece = % Apply switch state to get actual routing.
-      if N_DSWITCHES > 0 /\ cell_has_dswitch[r, c] then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
-      elseif N_ESWITCHES > 0 /\ cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
+      if N_DSWITCHES = 0 then
+        if N_ESWITCHES = 0 then piece
+        elseif cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
+        else piece endif
+      elseif cell_has_dswitch[r, c] then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time])
+      elseif N_ESWITCHES = 0 then piece
+      elseif cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
       else piece endif;
   } in
 
@@ -82,7 +89,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
     next_c = c /\
     next_entry_dir = entry_dir
   else
-    (if piece in TUNNELS_SET then % Tunnel: teleport to exit.
+    (if N_TUNNELS > 0 /\ piece in TUNNELS_SET then % Tunnel: teleport to exit.
        let {
          var 1..H: dest_r = tunnel_dest_row[r, c];
          var 1..W: dest_c = tunnel_dest_col[r, c];
@@ -112,7 +119,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
 
 % ==== TRAIN ARRIVAL CONSTRAINT ====
 % Once arrived at target, train stays there for all future timesteps.
-constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME where time >= arrival_time[t]) (
+constraint forall(t in 1..N_TRAINS, time in 1..MAX_ARRIVAL[t] where time >= arrival_time[t]) (
     train_row[t, time] = TARGET.1 /\
     train_col[t, time] = TARGET.2 /\
     train_dir[t, time] = LEFT % Assumed arrival orientation.
@@ -126,17 +133,43 @@ constraint forall(t in 1..N_TRAINS-1) (
 
 % ==== NO TRAIN COLLISIONS ====
 % No two trains occupy the same cell at the same time (before either arrives).
-constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME where i < arrival_time[t1])(
-    (train_row[t1, i] != train_row[t2, i] \/ train_col[t1, i] != train_col[t2, i]) % Distinct positions.
+constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_ARRIVAL[t1])(
+    train_cell[t1, i] != train_cell[t2, i] \/ i >= arrival_time[t1]
 );
 
 % ==== NO POSITION SWAPS ====
 % Trains cannot swap positions between consecutive timesteps (including tunnels).
-constraint forall(t1 in 1..N_TRAINS-1, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1 where i < arrival_time[t1])(
-    (tunnel_dest_row[train_row[t1, i], train_col[t1, i]] != train_row[t2, i+1] \/
-     tunnel_dest_col[train_row[t1, i], train_col[t1, i]] != train_col[t2, i+1]) \/ % t1 did not move to t2's position.
-    (tunnel_dest_row[train_row[t2, i], train_col[t2, i]] != train_row[t1, i+1] \/
-     tunnel_dest_col[train_row[t2, i], train_col[t2, i]] != train_col[t1, i+1]) % t2 did not move to t1's position.
+constraint forall(t1 in 1..N_TRAINS-1, t2 in t1 + 1..N_TRAINS, i in 1..(MAX_ARRIVAL[t1] - 1))(
+    (if N_TUNNELS = 0 then train_cell[t1, i] else tunnel_dest_cell[train_cell[t1, i]] endif) != train_cell[t2, i+1] \/
+    (if N_TUNNELS = 0 then train_cell[t2, i] else tunnel_dest_cell[train_cell[t2, i]] endif) != train_cell[t1, i+1] \/
+    i >= arrival_time[t1]
+);
+
+% ==== REACHABILITY CONES ====
+% A train can be at most 'time' steps away from its start position.
+constraint forall(t in 1..N_TRAINS, time in 0..MAX_ARRIVAL[t])(
+  abs(train_row[t, time] - TRAINS[t].1) + abs(train_col[t, time] - TRAINS[t].2) <= time
+);
+
+% A train must be close enough to target to reach it by arrival_time[t].
+constraint forall(t in 1..N_TRAINS, time in 0..MAX_ARRIVAL[t] where time < arrival_time[t])(
+  abs(train_row[t, time] - TARGET.1) + abs(train_col[t, time] - TARGET.2) <= arrival_time[t] - time
+);
+
+% ==== STATIC PARITY-FILTERED ARRIVAL TIME DOMAINS ====
+% arrival_time[t] must have correct parity AND be within [MIN_ARRIVAL[t], MAX_ARRIVAL[t]].
+% Express this as a set membership constraint to eliminate int_mod at runtime.
+array[1..N_TRAINS] of set of int: ARRIVAL_DOMAIN = [
+  { v | v in MIN_ARRIVAL[t]..MAX_ARRIVAL[t] where v mod 2 = TRAIN_DIST[t] mod 2 }
+| t in 1..N_TRAINS];
+
+constraint forall(t in 1..N_TRAINS)(
+  arrival_time[t] in ARRIVAL_DOMAIN[t]
+);
+
+% ==== PARITY-AWARE SEQUENTIAL ARRIVAL INCREMENT ====
+constraint forall(t in 1..N_TRAINS-1)(
+  arrival_time[t+1] >= arrival_time[t] + MIN_STEP_BETWEEN[t]
 );
 
 

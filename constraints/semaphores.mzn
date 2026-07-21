@@ -37,53 +37,53 @@ function var bool: semaphore_trigger(1..H: r, 1..W: c, var 0..(MAX_TIME + 1): t)
     )
   endif;
 
-% ==== SUPPLY CONSTRAINT ====
-% Player cannot place more semaphores than provided by the puzzle.
-constraint
-  sum(r in 1..H, c in 1..W)(bool2int(semaphore_present[r, c])) <= SEMAPHORE_SUPPLY;
-
-% Force presence to false when no semaphores are available.
-constraint SEMAPHORE_SUPPLY = 0 -> forall(r in 1..H, c in 1..W)(not semaphore_present[r, c]);
-
-% ==== PLACEMENT ELIGIBILITY CONSTRAINTS ====
-% Direct verification on semaphore_present cell attributes:
-constraint forall(r in 1..H, c in 1..W)(
-  semaphore_present[r, c] -> (
-      grid[r, c] in SEMAPHORE_ELIGIBLE_SET /\
-      (N_GATES = 0 \/ not cell_has_gate[r, c]) /\
-      (if N_ACTIVATIONS = 0 then true else
-        forall(a in 1..N_ACTIVATIONS)(
-          ACTIVATIONS[a].1 != r \/ ACTIVATIONS[a].2 != c
-        )
-      endif) /\
-      exists(d in Dir)(
-        let {
-          0..H+1: sr = r + dr[d];
-          0..W+1: sc = c + dc[d];
-        } in
-        if sr >= 1 /\ sr <= H /\ sc >= 1 /\ sc <= W then
-          can_connect[grid[r, c], d] /\
-          grid[sr, sc] in SWITCH_VARIANTS_SET /\
-          can_connect[grid[sr, sc], opposite[d]]
-        else false endif
-      )
+constraint if SEMAPHORE_SUPPLY = 0 then
+  % Movement constraints still read these cells for decoys.  Fixing the inert
+  % state preserves the original semantics and lets the flattener eliminate it.
+  forall(r in 1..H, c in 1..W)(
+    not semaphore_present[r, c] /\ semaphore_open_time[r, c] = 0
   )
-);
+else
+  % ==== SUPPLY CONSTRAINT ====
+  sum(r in 1..H, c in 1..W)(bool2int(semaphore_present[r, c])) <= SEMAPHORE_SUPPLY /\
 
-% ==== TIMING & STATE EVOLUTION RULES ====
-% Unused cells have open time 0. Placed semaphores open at the earliest trigger timestep,
-% or stay closed (represented by MAX_TIME + 1).
-constraint forall(r in 1..H, c in 1..W)(
-  (not semaphore_present[r, c]) -> semaphore_open_time[r, c] = 0
-);
+  % ==== PLACEMENT ELIGIBILITY CONSTRAINTS ====
+  forall(r in 1..H, c in 1..W)(
+    semaphore_present[r, c] -> (
+        grid[r, c] in SEMAPHORE_ELIGIBLE_SET /\
+        (N_GATES = 0 \/ not cell_has_gate[r, c]) /\
+        (if N_ACTIVATIONS = 0 then true else
+          forall(a in 1..N_ACTIVATIONS)(
+            ACTIVATIONS[a].1 != r \/ ACTIVATIONS[a].2 != c
+          )
+        endif) /\
+        exists(d in Dir)(
+          let {
+            0..H+1: sr = r + dr[d];
+            0..W+1: sc = c + dc[d];
+          } in
+          if sr >= 1 /\ sr <= H /\ sc >= 1 /\ sc <= W then
+            can_connect[grid[r, c], d] /\
+            grid[sr, sc] in SWITCH_VARIANTS_SET /\
+            can_connect[grid[sr, sc], opposite[d]]
+          else false endif
+        )
+    )
+  ) /\
 
-constraint forall(r in 1..H, c in 1..W)(
-  semaphore_present[r, c] -> (
-    semaphore_open_time[r, c] >= 1 /\
-    semaphore_open_time[r, c] <= MAX_TIME + 1 /\
-    (semaphore_open_time[r, c] <= MAX_TIME -> semaphore_trigger(r, c, semaphore_open_time[r, c])) /\
-    forall(t in 1..MAX_TIME)(
-      (t < semaphore_open_time[r, c]) -> not semaphore_trigger(r, c, t)
+  % ==== TIMING & STATE EVOLUTION RULES ====
+  forall(r in 1..H, c in 1..W)(
+    (not semaphore_present[r, c]) -> semaphore_open_time[r, c] = 0
+  ) /\
+
+  forall(r in 1..H, c in 1..W)(
+    semaphore_present[r, c] -> (
+      semaphore_open_time[r, c] >= 1 /\
+      semaphore_open_time[r, c] <= MAX_TIME + 1 /\
+      (semaphore_open_time[r, c] <= MAX_TIME -> semaphore_trigger(r, c, semaphore_open_time[r, c])) /\
+      forall(t in 1..MAX_TIME)(
+        (t < semaphore_open_time[r, c]) -> not semaphore_trigger(r, c, t)
+      )
     )
   )
-);
+endif;

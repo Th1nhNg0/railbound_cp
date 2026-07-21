@@ -24,11 +24,13 @@ constraint forall(d in 1..N_DECOYS) (
     1..W: intended_c = raw_intended_c;
     Dir: intended_entry_dir = opposite[dir0];
     var bool: blocked_by_gate = % Check if target is blocked by closed gate.
-      if N_GATES >0 /\ cell_has_gate[intended_r, intended_c] then
+      if N_GATES = 0 then false
+      elseif cell_has_gate[intended_r, intended_c] then
         not gate_open[gate_index_at[intended_r, intended_c], 1]
       else false endif;
     var bool: blocked_by_semaphore =
-      if semaphore_present[intended_r, intended_c] then
+      if SEMAPHORE_SUPPLY = 0 then false
+      elseif semaphore_present[intended_r, intended_c] then
         1 < semaphore_open_time[intended_r, intended_c]
       else false endif;
     var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
@@ -57,20 +59,46 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
         var 1..H: next_r = decoy_row[d, time+1];
         var 1..W: next_c = decoy_col[d, time+1];
         var Dir: next_entry_dir = decoy_dir[d, time+1];
-        var 0..H+1: intended_r;
-        var 0..W+1: intended_c;
+        % Keep lookup coordinates in range even when the selected exit points
+        % off-board.  The separate flag below retains the stay-at-a-dead-end
+        % behavior without ever indexing an array with 0 or H/W + 1.
+        var 0..H+1: raw_intended_r;
+        var 0..W+1: raw_intended_c;
+        var bool: intended_in_bounds =
+            raw_intended_r >= 1 /\ raw_intended_r <= H /\
+            raw_intended_c >= 1 /\ raw_intended_c <= W;
+        var 1..H: intended_r =
+            if raw_intended_r < 1 then 1
+            elseif raw_intended_r > H then H
+            else raw_intended_r endif;
+        var 1..W: intended_c =
+            if raw_intended_c < 1 then 1
+            elseif raw_intended_c > W then W
+            else raw_intended_c endif;
         var Dir: intended_entry_dir;
-        var bool: blocked_by_gate = if N_GATES >0 /\ cell_has_gate[intended_r, intended_c] then % Check if blocked.
+        % intended_r/c may be outside the board at a dead end.  Check bounds
+        % before indexing gate or semaphore state; otherwise -O2+ turns the
+        % undefined array access into a false constraint.
+        var bool: blocked_by_gate = if N_GATES = 0 then false
+            elseif not intended_in_bounds then false
+            elseif cell_has_gate[intended_r, intended_c] then % Check if blocked.
                 not gate_open[gate_index_at[intended_r, intended_c], time+1]
             else false endif;
         var bool: blocked_by_semaphore =
-            if semaphore_present[intended_r, intended_c] then
+            if SEMAPHORE_SUPPLY = 0 then false
+            elseif not intended_in_bounds then false
+            elseif semaphore_present[intended_r, intended_c] then
                 time + 1 < semaphore_open_time[intended_r, intended_c]
             else false endif;
         var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
         var Piece: effective_piece = % Apply switch state.
-            if N_DSWITCHES > 0 /\ cell_has_dswitch[r, c] then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time]) 
-            elseif N_ESWITCHES > 0 /\ cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
+            if N_DSWITCHES = 0 then
+                if N_ESWITCHES = 0 then piece
+                elseif cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
+                else piece endif
+            elseif cell_has_dswitch[r, c] then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time])
+            elseif N_ESWITCHES = 0 then piece
+            elseif cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
             else piece endif;
     } in
 
@@ -89,23 +117,25 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
                              var 1..W: dest_c = tunnel_dest_col[r, c];
                              var Dir: dest_exit_dir_enum = to_enum(Dir, tunnel_exit_dir[r, c]);
                      } in
-                     intended_r = dest_r + dr[dest_exit_dir_enum] /\
-                     intended_c = dest_c + dc[dest_exit_dir_enum] /\
+                     raw_intended_r = dest_r + dr[dest_exit_dir_enum] /\
+                     raw_intended_c = dest_c + dc[dest_exit_dir_enum] /\
                      intended_entry_dir = opposite[dest_exit_dir_enum]
              else % Normal track: follow routing.
                      exit_dir = exit_of[effective_piece, entry_dir] /\
-                     intended_r = r + dr[exit_dir] /\
-                     intended_c = c + dc[exit_dir] /\
+                     raw_intended_r = r + dr[exit_dir] /\
+                     raw_intended_c = c + dc[exit_dir] /\
                      intended_entry_dir = opposite[exit_dir]
              endif) /\
-            if (intended_c >= 1 /\ intended_c <= W /\ intended_r >= 1 /\ intended_r <= H /\
-                can_enter[grid[intended_r, intended_c], intended_entry_dir] /\ 
-                grid[intended_r,intended_c] !=EMPTY /\ 
-                not blocked
-            ) then % Valid move: proceed.
+            if intended_in_bounds then
+                if can_enter[grid[intended_r, intended_c], intended_entry_dir] /\
+                   grid[intended_r, intended_c] != EMPTY /\
+                   not blocked then % Valid move: proceed.
                     (next_r, next_c, next_entry_dir) = (intended_r, intended_c, intended_entry_dir)
-            else % Invalid move: stay.
+                else % Invalid in-board move: stay.
                     (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
+                endif
+            else % Off-board move: stay.
+                (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
             endif
         endif
     endif

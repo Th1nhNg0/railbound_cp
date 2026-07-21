@@ -16,13 +16,16 @@ array[Dir] of Dir: opposite = [ DOWN, LEFT, TOP, RIGHT ]; % Opposite direction f
 % Maps tunnel cells to their destination coordinates and exit direction.
 array[1..H, 1..W] of 1..H: tunnel_dest_row =
   array2d(1..H, 1..W, [
-    let {
-      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
-      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
-    } in
-    if idx_A > 0 then TUNNEL_PAIRS[idx_A].4
-    elseif idx_B > 0 then TUNNEL_PAIRS[idx_B].1
-    else r % non-tunnel cells map to themselves
+    if N_TUNNELS = 0 then r
+    else
+      let {
+        int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
+        int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
+      } in
+      if idx_A > 0 then TUNNEL_PAIRS[idx_A].4
+      elseif idx_B > 0 then TUNNEL_PAIRS[idx_B].1
+      else r % non-tunnel cells map to themselves
+      endif
     endif
   | r in 1..H, c in 1..W
   ]);
@@ -30,13 +33,16 @@ array[1..H, 1..W] of 1..H: tunnel_dest_row =
 % Maps each cell to its tunnel destination column.
 array[1..H, 1..W] of 1..W: tunnel_dest_col =
   array2d(1..H, 1..W, [
-    let {
-      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
-      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
-    } in
-    if idx_A > 0 then TUNNEL_PAIRS[idx_A].5
-    elseif idx_B > 0 then TUNNEL_PAIRS[idx_B].2
-    else c % non-tunnel cells map to themselves
+    if N_TUNNELS = 0 then c
+    else
+      let {
+        int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
+        int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
+      } in
+      if idx_A > 0 then TUNNEL_PAIRS[idx_A].5
+      elseif idx_B > 0 then TUNNEL_PAIRS[idx_B].2
+      else c % non-tunnel cells map to themselves
+      endif
     endif
   | r in 1..H, c in 1..W
   ]);
@@ -45,16 +51,32 @@ array[1..H, 1..W] of 1..W: tunnel_dest_col =
 % Defaults to 1 (TOP) for non-tunnels.
 array[1..H, 1..W] of int: tunnel_exit_dir =
   array2d(1..H, 1..W, [
-    let {
-      int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
-      int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
-    } in
-    if idx_A > 0 then enum2int(TUNNEL_PAIRS[idx_A].6)
-    elseif idx_B > 0 then enum2int(TUNNEL_PAIRS[idx_B].3)
-    else 1
+    if N_TUNNELS = 0 then 1
+    else
+      let {
+        int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
+        int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
+      } in
+      if idx_A > 0 then enum2int(TUNNEL_PAIRS[idx_A].6)
+      elseif idx_B > 0 then enum2int(TUNNEL_PAIRS[idx_B].3)
+      else 1
+      endif
     endif
   | r in 1..H, c in 1..W
   ]);
+
+% 1D mapping of cells to tunnel destinations.
+array[1..(H*W)] of 1..(H*W): tunnel_dest_cell = [
+  if N_TUNNELS = 0 then idx
+  else
+    let {
+      int: r = ((idx - 1) div W) + 1;
+      int: c = ((idx - 1) mod W) + 1;
+    } in
+    (tunnel_dest_row[r, c] - 1) * W + tunnel_dest_col[r, c]
+  endif
+| idx in 1..(H*W)
+];
 
 % ==== GATE METADATA ====
 % Maps cells to gates and tracks gate placement.
@@ -97,6 +119,15 @@ array[1..H, 1..W] of bool: cell_is_init =
     int: init_count = if N_INIT_POS = 0 then 0 else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(1) endif;
     int: tunnel_count = if N_TUNNELS = 0 then 0 else sum(i in 1..N_TUNNELS where (TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c) \/ (TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c))(1) endif;
   } in init_count > 0 \/ tunnel_count > 0 | r in 1..H, c in 1..W ]);
+
+% Boolean grid indicating which cells statically contain ROCK.
+array[1..H, 1..W] of bool: cell_is_rock =
+  array2d(1..H, 1..W, [
+    if N_INIT_POS = 0 then false
+    else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(bool2int(INIT_POS[i].3 == ROCK)) > 0
+    endif
+  | r in 1..H, c in 1..W
+  ]);
 
 % ==== ROUTING PERMISSION TABLES ====
 % can_enter[p, d]: true if a train entering from direction d can enter piece p.
@@ -185,6 +216,7 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
 % can_connect[p, d]: true if direction d is relevant to piece p (entry or exit possible).
 % Used for routing validation and connectivity checks.
 array[Piece, Dir] of bool: can_connect = array2d(Piece, Dir, [can_enter[p, d] \/ can_exit[p, d] | p in Piece, d in Dir]);
+array[Dir] of set of Piece: CONNECTS_DIR = [ { p | p in Piece where can_connect[p, d] } | d in Dir ];
 
 % exit_of[p, d]: Determines the exit direction when entering piece p from direction d.
 % Core routing: determines where a train ends up after traversing piece p.
@@ -319,3 +351,22 @@ function var Piece: dswitch_effective_piece(var Piece: base_piece, var bool: tog
 % eswitch_effective_piece: Applies the current toggle state to get the actual piece routing.
 function var Piece: eswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
   if toggled then eswitch_toggle[base_piece] else base_piece endif; % Returns toggled or original piece.
+
+% ==== STATIC BOUNDS ON ARRIVAL TIME (FORWARD & BACKWARD PASSES) ====
+array[1..N_TRAINS] of int: TRAIN_DIST = [
+  abs(TRAINS[t].1 - TARGET.1) + abs(TRAINS[t].2 - TARGET.2)
+| t in 1..N_TRAINS];
+
+array[1..N_TRAINS] of int: MIN_STEP_BETWEEN = [
+  if t < N_TRAINS then
+    if (TRAIN_DIST[t] mod 2) == (TRAIN_DIST[t+1] mod 2) then 2 else 1 endif
+  else 0 endif
+| t in 1..N_TRAINS];
+
+array[1..N_TRAINS] of int: MIN_ARRIVAL = [
+  max([ TRAIN_DIST[k] + sum(j in k..t-1)(MIN_STEP_BETWEEN[j]) | k in 1..t ])
+| t in 1..N_TRAINS];
+
+array[1..N_TRAINS] of int: MAX_ARRIVAL = [
+  MAX_TIME - sum(j in t..N_TRAINS-1)(MIN_STEP_BETWEEN[j])
+| t in 1..N_TRAINS];

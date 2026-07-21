@@ -72,7 +72,10 @@ constraint forall(r in 1..H, c in 1..W)(
 
 % ==== PLACED PIECE USAGE CONSTRAINT ====
 % Manually placed pieces must be traversed by at least one train or decoy.
-constraint forall(r in 1..H, c in 1..W)(
- grid[r,c] != EMPTY /\ not cell_is_init[r, c] -> exists(t in 1..N_TRAINS, i in 1..arrival_time[t])(train_row[t,i]=r /\ train_col[t,i]=c)
- \/ exists(d in 1..N_DECOYS, i in 1..MAX_TIME)(decoy_row[d,i]=r /\ decoy_col[d,i]=c) % Piece must be used.
+constraint forall(r in 1..H, c in 1..W where not cell_is_init[r, c])(
+ let { int: cell_idx = (r - 1) * W + c; } in
+ grid[r, c] != EMPTY -> (
+   exists(t in 1..N_TRAINS, i in 1..MAX_ARRIVAL[t] where i <= arrival_time[t])(train_cell[t, i] = cell_idx)
+   \/ (if N_DECOYS = 0 then false else exists(d in 1..N_DECOYS, i in 1..MAX_TIME)(decoy_cell[d, i] = cell_idx) endif)
+ )
 );

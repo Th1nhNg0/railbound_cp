@@ -14,32 +14,30 @@ set of int: ACTIVATION_IDS = if MAX_ID = 0 then {} else 1..MAX_ID endif;
 array[ACTIVATION_IDS, 0..MAX_TIME] of var bool: should_toggle;
 
 % ==== INITIAL TOGGLE STATE ====
-% No toggles at time 0.
-constraint forall(a in ACTIVATION_IDS)(
-    should_toggle[a, 0] = false
-);
-
-% ==== DETERMINE TOGGLE AT EACH TIMESTEP ====
-% Toggle occurs when odd number of trains/decoys newly enter the activation cell.
-constraint forall(a in ACTIVATION_IDS, t in 1..MAX_TIME)(
-    should_toggle[a, t] = ((sum(
-        act in 1..N_ACTIVATIONS where ACTIVATIONS[act].3 = a
-    )(
-        sum(tr in 1..N_TRAINS where arrival_time[tr] >= t)(
-            bool2int(
-                train_row[tr, t - 1] = ACTIVATIONS[act].1 /\ % At activation cell now.
-                train_col[tr, t - 1] = ACTIVATIONS[act].2 /\
-                (t = 1 \/ train_row[tr, max(0, t - 2)] != ACTIVATIONS[act].1 \/ train_col[tr, max(0, t - 2)] != ACTIVATIONS[act].2) % But not before.
+constraint if N_ACTIVATIONS > 0 then
+    forall(a in ACTIVATION_IDS)(
+        should_toggle[a, 0] = false
+    ) /\
+    forall(a in ACTIVATION_IDS, t in 1..MAX_TIME)(
+        should_toggle[a, t] = ((sum(
+            act in 1..N_ACTIVATIONS where ACTIVATIONS[act].3 = a
+        )(
+            sum(tr in 1..N_TRAINS where arrival_time[tr] >= t)(
+                bool2int(
+                    train_row[tr, t - 1] = ACTIVATIONS[act].1 /\
+                    train_col[tr, t - 1] = ACTIVATIONS[act].2 /\
+                    (t = 1 \/ train_row[tr, max(0, t - 2)] != ACTIVATIONS[act].1 \/ train_col[tr, max(0, t - 2)] != ACTIVATIONS[act].2)
+                )
+            ) + sum(d in 1..N_DECOYS)(
+                bool2int(
+                    decoy_row[d, t - 1] = ACTIVATIONS[act].1 /\
+                    decoy_col[d, t - 1] = ACTIVATIONS[act].2 /\
+                    (t = 1 \/ decoy_row[d, max(0, t - 2)] != ACTIVATIONS[act].1 \/ decoy_col[d, max(0, t - 2)] != ACTIVATIONS[act].2)
+                )
             )
-        ) + sum(d in 1..N_DECOYS)(
-            bool2int(
-                decoy_row[d, t - 1] = ACTIVATIONS[act].1 /\ % At activation cell now.
-                decoy_col[d, t - 1] = ACTIVATIONS[act].2 /\
-                (t = 1 \/ decoy_row[d, max(0, t - 2)] != ACTIVATIONS[act].1 \/ decoy_col[d, max(0, t - 2)] != ACTIVATIONS[act].2) % But not before.
-            )
-        )
-    )) mod 2 = 1) % Odd number = toggle.
-);
+        )) mod 2 = 1)
+    )
+else true endif;
 
 % ==== GATE INITIAL STATE ====
 % Gates start in the state specified by the input data.
