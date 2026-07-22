@@ -2,6 +2,9 @@ results/
 __pycache__/
 /benchmark_results/
 !/docs/benchmark_results/
+/.benchmark_probe/
+/results.tsv
+/run.log
 .DS_Store
 renders/
 .vscode/
