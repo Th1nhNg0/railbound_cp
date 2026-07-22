@@ -50,10 +50,8 @@ constraint forall(t in 1..N_TRAINS, i in 1..arrival_time[t])(
 % ==== CONNECTIVITY CONSTRAINT ====
 % Manually placed pieces must connect to neighbors (preventing floating tracks).
 % Allows dead-ends (useful for decoy parking): switches require >= 2 connections; corners and straights >= 1.
-constraint forall(r in 1..H, c in 1..W)(
-  (((grid[r, c] in SWITCHES_SET) \/ (grid[r, c] in CORNERS_SET) \/ (grid[r, c] in STRAIGHTS_SET)) /\
-  not cell_is_init[r, c]) % Only if manually placed.
-  ->
+constraint forall(r in 1..H, c in 1..W where not cell_is_init[r, c])(
+  grid[r, c] != EMPTY ->
   sum(d in Dir)(
     let {
       0..H+1: nr = r + dr[d];
