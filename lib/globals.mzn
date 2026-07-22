@@ -91,11 +91,6 @@ array[1..H, 1..W] of 1..ESWITCH_INDEX_UPPER: eswitch_index_at =
 array[1..H, 1..W] of bool: cell_has_eswitch =
   array2d(1..H, 1..W, [ let { int: count = if N_ESWITCHES = 0 then 0 else sum(es in 1..N_ESWITCHES where ESWITCHES_DERIVED[es].1 = r /\ ESWITCHES_DERIVED[es].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
 
-% ==== STATION METADATA ====
-% Maps cells to stations and tracks their placement.
-array[1..H, 1..W] of bool: cell_has_station =
-  array2d(1..H, 1..W, [ let { int: count = if N_STATIONS = 0 then 0 else sum(st in 1..N_STATIONS where STATIONS[st].1 = r /\ STATIONS[st].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
-
 % ==== PRE-PLACED PIECE TRACKING ====
 % Boolean grid indicating which cells contain fixed, unmovable pieces.
 array[1..H, 1..W] of bool: cell_is_init =
