@@ -6,15 +6,6 @@
 % before reaching the target.
 % ============================================================
 
-% ==== STATION DECISION VARIABLES ====
-% station_wait_time[t, time]: remaining wait steps (0 = no waiting, >0 = waiting).
-set of int: STATION_TIMES = if N_STATIONS = 0 then {} else 0..MAX_TIME endif;
-array[1..N_TRAINS, STATION_TIMES] of var 0..2: station_wait_time;
-array[1..N_DECOYS, STATION_TIMES] of var 0..2: decoy_station_wait_time;
-
-% station_visited_by_time[st, time]: true if station st visited by time step.
-array[1..N_STATIONS, 0..MAX_TIME] of var bool: station_visited_by_time;
-
 % ==== STATION ASSIGNMENT MAPPING ====
 % Pre-compute which stations each train must visit.
 int: MAX_STATIONS_PER_VEHICLE = N_STATIONS; % Max stations per train.

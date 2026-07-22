@@ -61,6 +61,13 @@ array[GATE_INDICES, 0..MAX_TIME] of var bool: gate_open;
 array[DSWITCH_INDICES, 0..MAX_TIME] of var bool: dswitch_toggled;
 array[ESWITCH_INDICES, 0..MAX_TIME] of var bool: eswitch_toggled;
 
+% Station state is declared centrally so feature-specialized models can omit
+% station constraints entirely when the station index set is empty.
+set of int: STATION_TIMES = if N_STATIONS = 0 then {} else 0..MAX_TIME endif;
+array[1..N_TRAINS, STATION_TIMES] of var 0..2: station_wait_time;
+array[1..N_DECOYS, STATION_TIMES] of var 0..2: decoy_station_wait_time;
+array[1..N_STATIONS, 0..MAX_TIME] of var bool: station_visited_by_time;
+
 
 % Semaphore Placement: Direct presence indicator and opening time per cell.
 % These arrays remain grid-shaped even when no semaphores are supplied.  Decoy

@@ -10,23 +10,22 @@ param(
 $ErrorActionPreference = "Stop"
 $scriptDirectory = Split-Path -Parent $PSCommandPath
 $projectRoot = Split-Path -Parent $scriptDirectory
-$modelPath = Join-Path $projectRoot "main.mzn"
 
 if ([string]::IsNullOrWhiteSpace($MiniZincPath)) {
     $MiniZincPath = (Get-Command minizinc -ErrorAction Stop).Source
 }
 
 $puzzles = @(
-    @{ Name = "1-10"; Path = "data/1/1-10.dzn" },
-    @{ Name = "2-1";  Path = "data/2/2-1.dzn" },
-    @{ Name = "3-2";  Path = "data/3/3-2.dzn" },
-    @{ Name = "3-8A"; Path = "data/3/3-8A.dzn" },
-    @{ Name = "4-1";  Path = "data/4/4-1.dzn" },
-    @{ Name = "5-2";  Path = "data/5/5-2.dzn" },
-    @{ Name = "6-1";  Path = "data/6/6-1.dzn" },
-    @{ Name = "7-1";  Path = "data/7/7-1.dzn" },
-    @{ Name = "8-2";  Path = "data/8/8-2.dzn" },
-    @{ Name = "9-1";  Path = "data/9/9-1.dzn" }
+    @{ Name = "1-10"; Path = "data/1/1-10.dzn"; Model = "basic.mzn" },
+    @{ Name = "2-1";  Path = "data/2/2-1.dzn"; Model = "basic.mzn" },
+    @{ Name = "3-2";  Path = "data/3/3-2.dzn"; Model = "activations.mzn" },
+    @{ Name = "3-8A"; Path = "data/3/3-8A.dzn"; Model = "activations.mzn" },
+    @{ Name = "4-1";  Path = "data/4/4-1.dzn"; Model = "activations.mzn" },
+    @{ Name = "5-2";  Path = "data/5/5-2.dzn"; Model = "stations.mzn" },
+    @{ Name = "6-1";  Path = "data/6/6-1.dzn"; Model = "eswitches.mzn" },
+    @{ Name = "7-1";  Path = "data/7/7-1.dzn"; Model = "decoys.mzn" },
+    @{ Name = "8-2";  Path = "data/8/8-2.dzn"; Model = "basic.mzn" },
+    @{ Name = "9-1";  Path = "data/9/9-1.dzn"; Model = "semaphores.mzn" }
 )
 
 $metricNames = @(
@@ -52,6 +51,7 @@ $rows = @()
 for ($repeat = 1; $repeat -le $Repeats; $repeat++) {
     foreach ($puzzle in $puzzles) {
         $dataPath = Join-Path $projectRoot $puzzle.Path
+        $modelPath = Join-Path (Join-Path $projectRoot "benchmark_models") $puzzle.Model
         $arguments = @(
             "--solver", "chuffed",
             "-O0",
