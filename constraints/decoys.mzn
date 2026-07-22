@@ -92,14 +92,14 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
             else false endif;
         var bool: blocked = blocked_by_gate \/ blocked_by_semaphore;
         var Piece: effective_piece = % Apply switch state.
-            if N_DSWITCHES = 0 then
-                if N_ESWITCHES = 0 then piece
-                elseif cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
-                else piece endif
-            elseif cell_has_dswitch[r, c] then dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time])
-            elseif N_ESWITCHES = 0 then piece
-            elseif cell_has_eswitch[r, c] then eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
-            else piece endif;
+            if N_DSWITCHES > 0 /\ cell_has_dswitch[r, c] then
+                dswitch_effective_piece(piece, dswitch_toggled[dswitch_index_at[r, c], time])
+            elseif N_ESWITCHES > 0 /\ cell_has_eswitch[r, c] then
+                eswitch_effective_piece(piece, eswitch_toggled[eswitch_index_at[r, c], time])
+            else
+                piece
+            endif;
+
     } in
 
     let {
