@@ -40,13 +40,6 @@ constraint forall(r in 1..H, c in 1..W where not cell_is_init[r, c])(
     grid[r, c] in PLACEABLE_SET
 );
 
-% ==== TRAIN PATH VALIDITY ====
-% Trains move only on valid track (not EMPTY, not ROCK).
-constraint forall(t in 1..N_TRAINS, i in 1..arrival_time[t])(
-    grid[train_row[t, i], train_col[t, i]] != EMPTY /\
-    grid[train_row[t, i], train_col[t, i]] != ROCK % Valid track required.
-);
-
 % ==== CONNECTIVITY CONSTRAINT ====
 % Manually placed pieces must connect to neighbors (preventing floating tracks).
 % Allows dead-ends (useful for decoy parking): switches require >= 2 connections; corners and straights >= 1.

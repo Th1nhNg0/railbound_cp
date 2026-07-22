@@ -111,7 +111,7 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
         if piece = EMPTY then % On empty cell: stay.
             (next_r, next_c, next_entry_dir) = (r, c, entry_dir)
         else
-            (if piece in TUNNELS_SET then % Tunnel: teleport to exit.
+            (if N_TUNNELS > 0 /\ piece in TUNNELS_SET then % Tunnel: teleport to exit.
                      let {
                              var 1..H: dest_r = tunnel_dest_row[r, c];
                              var 1..W: dest_c = tunnel_dest_col[r, c];
