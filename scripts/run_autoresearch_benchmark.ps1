@@ -4,6 +4,7 @@ param(
     [int]$Repeats = 3,
     [ValidateRange(1000, 3600000)]
     [int]$TimeLimitMilliseconds = 30000,
+    [int]$RandomSeed = 1,
     [string]$MiniZincPath = "",
     [string]$ChuffedPath = ""
 )
@@ -80,7 +81,7 @@ try {
         for ($repeat = 1; $repeat -le $Repeats; $repeat++) {
             $savedErrorActionPreference = $ErrorActionPreference
             $ErrorActionPreference = "Continue"
-            $solveOutput = (& $ChuffedPath -s -t $TimeLimitMilliseconds $fznPath 2>&1 | Out-String)
+            $solveOutput = (& $ChuffedPath -s -t $TimeLimitMilliseconds --rnd-seed $RandomSeed $fznPath 2>&1 | Out-String)
             $solveExitCode = $LASTEXITCODE
             $ErrorActionPreference = $savedErrorActionPreference
             if ($solveExitCode -ne 0 -or $solveOutput -notmatch "(?m)^----------`r?$") {
