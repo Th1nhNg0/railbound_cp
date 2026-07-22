@@ -162,19 +162,29 @@ constraint forall(d in 1..N_DECOYS, i in 1..MAX_TIME)(
 % ==== DECOY-DECOY POSITION SWAP PREVENTION ====
 % No position swaps between consecutive timesteps.
 constraint forall(d1 in 1..N_DECOYS, d2 in d1 + 1..N_DECOYS, i in 1..MAX_TIME-1)(
-    (tunnel_dest_row[decoy_row[d1, i], decoy_col[d1, i]] != decoy_row[d2, i+1] \/
-     tunnel_dest_col[decoy_row[d1, i], decoy_col[d1, i]] != decoy_col[d2, i+1]) \/ % d1 did not move to d2's position.
-    (tunnel_dest_row[decoy_row[d2, i], decoy_col[d2, i]] != decoy_row[d1, i+1] \/
-     tunnel_dest_col[decoy_row[d2, i], decoy_col[d2, i]] != decoy_col[d1, i+1]) % d2 did not move to d1's position.
+    if N_TUNNELS = 0 then
+      (decoy_row[d1, i] != decoy_row[d2, i+1] \/ decoy_col[d1, i] != decoy_col[d2, i+1]) \/
+      (decoy_row[d2, i] != decoy_row[d1, i+1] \/ decoy_col[d2, i] != decoy_col[d1, i+1])
+    else
+      (tunnel_dest_row[decoy_row[d1, i], decoy_col[d1, i]] != decoy_row[d2, i+1] \/
+       tunnel_dest_col[decoy_row[d1, i], decoy_col[d1, i]] != decoy_col[d2, i+1]) \/
+      (tunnel_dest_row[decoy_row[d2, i], decoy_col[d2, i]] != decoy_row[d1, i+1] \/
+       tunnel_dest_col[decoy_row[d2, i], decoy_col[d2, i]] != decoy_col[d1, i+1])
+    endif
 );
 
 % ==== DECOY-TRAIN POSITION SWAP PREVENTION ====
 % Decoys and trains cannot exchange positions.
 constraint forall(d in 1..N_DECOYS, t in 1..N_TRAINS, i in 1..MAX_TIME-1 where i < arrival_time[t])(
-    (tunnel_dest_row[decoy_row[d, i], decoy_col[d, i]] != train_row[t, i+1] \/
-     tunnel_dest_col[decoy_row[d, i], decoy_col[d, i]] != train_col[t, i+1]) \/ % d did not move to t's position.
-    (tunnel_dest_row[train_row[t, i], train_col[t, i]] != decoy_row[d, i+1] \/
-     tunnel_dest_col[train_row[t, i], train_col[t, i]] != decoy_col[d, i+1]) % t did not move to d's position.
+    if N_TUNNELS = 0 then
+      (decoy_row[d, i] != train_row[t, i+1] \/ decoy_col[d, i] != train_col[t, i+1]) \/
+      (train_row[t, i] != decoy_row[d, i+1] \/ train_col[t, i] != decoy_col[d, i+1])
+    else
+      (tunnel_dest_row[decoy_row[d, i], decoy_col[d, i]] != train_row[t, i+1] \/
+       tunnel_dest_col[decoy_row[d, i], decoy_col[d, i]] != train_col[t, i+1]) \/
+      (tunnel_dest_row[train_row[t, i], train_col[t, i]] != decoy_row[d, i+1] \/
+       tunnel_dest_col[train_row[t, i], train_col[t, i]] != decoy_col[d, i+1])
+    endif
 );
 
 
