@@ -8,11 +8,9 @@
 % ==== TRACK LIMIT CONSTRAINT ====
 % Ensures the number of placed tracks does not exceed MAX_TRACKS.
 % Counts only non-empty, non-initial, non-tunnel cells as placed tracks.
-int: INIT_EMPTY = W*H - (N_INIT_POS + 2 * N_TUNNELS); % Initial empty count.
-constraint
-  INIT_EMPTY - sum(r in 1..H, c in 1..W)(
-      bool2int(grid[r, c] == EMPTY)
-    ) <= MAX_TRACKS; % Placed tracks ≤ limit.
+constraint sum(r in 1..H, c in 1..W where not cell_is_init[r, c])(
+  bool2int(grid[r, c] != EMPTY)
+) <= MAX_TRACKS;
 
 % ==== INITIAL POSITION CONSTRAINT ====
 % Pre-placed pieces from INIT_POS must appear exactly as specified.
