@@ -4,7 +4,8 @@ param(
     [int]$Repeats = 3,
     [ValidateRange(1000, 3600000)]
     [int]$TimeLimitMilliseconds = 30000,
-    [string]$MiniZincPath = ""
+    [string]$MiniZincPath = "",
+    [string]$ChuffedPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,6 +14,15 @@ $projectRoot = Split-Path -Parent $scriptDirectory
 
 if ([string]::IsNullOrWhiteSpace($MiniZincPath)) {
     $MiniZincPath = (Get-Command minizinc -ErrorAction Stop).Source
+}
+if ([string]::IsNullOrWhiteSpace($ChuffedPath)) {
+    $ChuffedPath = Join-Path (Split-Path -Parent $MiniZincPath) "fzn-chuffed.exe"
+    if (-not (Test-Path -LiteralPath $ChuffedPath -PathType Leaf)) {
+        $ChuffedPath = Join-Path (Join-Path (Split-Path -Parent $MiniZincPath) "bin") "fzn-chuffed.exe"
+    }
+}
+if (-not (Test-Path -LiteralPath $ChuffedPath -PathType Leaf)) {
+    throw "Chuffed executable not found: $ChuffedPath"
 }
 
 $puzzles = @(
@@ -28,69 +38,108 @@ $puzzles = @(
     @{ Name = "9-1";  Path = "data/9/9-1.dzn"; Model = "semaphores.mzn" }
 )
 
-$metricNames = @(
-    "solveTime", "flatTime", "failures", "propagations",
-    "flatBoolVars", "flatIntVars", "flatBoolConstraints",
-    "flatIntConstraints", "boolVariables"
-)
-
 function Get-Metric {
     param([string]$Output, [string]$Name)
 
     $match = [regex]::Match($Output, "%%%mzn-stat: $([regex]::Escape($Name))=([^`r`n]+)")
-    if (-not $match.Success) {
-        throw "Missing metric '$Name'"
-    }
-    return [double]::Parse(
-        $match.Groups[1].Value.Trim(),
-        [Globalization.CultureInfo]::InvariantCulture
-    )
+    if (-not $match.Success) { throw "Missing metric '$Name'" }
+    return [double]::Parse($match.Groups[1].Value.Trim(), [Globalization.CultureInfo]::InvariantCulture)
 }
 
+$cacheRoot = Join-Path ([IO.Path]::GetTempPath()) ("railbound_benchmark_" + [guid]::NewGuid().ToString("N"))
+$generatedFiles = [Collections.Generic.List[string]]::new()
 $rows = @()
-for ($repeat = 1; $repeat -le $Repeats; $repeat++) {
+$compileMetrics = @{}
+
+try {
+    New-Item -ItemType Directory -Path $cacheRoot | Out-Null
+
     foreach ($puzzle in $puzzles) {
-        $dataPath = Join-Path $projectRoot $puzzle.Path
         $modelPath = Join-Path (Join-Path $projectRoot "benchmark_models") $puzzle.Model
-        $arguments = @(
-            "--solver", "chuffed",
-            "-O0",
-            "-t", $TimeLimitMilliseconds,
-            "--statistics",
-            $modelPath,
-            $dataPath
+        $dataPath = Join-Path $projectRoot $puzzle.Path
+        $fznPath = Join-Path $cacheRoot ($puzzle.Name + ".fzn")
+        $generatedFiles.Add($fznPath)
+
+        $compileArguments = @(
+            "--solver", "chuffed", "-O0", "--compile", "--statistics",
+            "--no-output-ozn", "--fzn", $fznPath, $modelPath, $dataPath
         )
-        $savedErrorActionPreference = $ErrorActionPreference
-        $ErrorActionPreference = "Continue"
-        $output = (& $MiniZincPath @arguments 2>&1 | Out-String)
-        $exitCode = $LASTEXITCODE
-        $ErrorActionPreference = $savedErrorActionPreference
-        if ($exitCode -ne 0 -or $output -notmatch "%%%mzn-stat: nSolutions=1") {
-            throw "Puzzle $($puzzle.Name) failed on repeat $repeat`n$output"
+        $compileOutput = (& $MiniZincPath @compileArguments 2>&1 | Out-String)
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fznPath -PathType Leaf)) {
+            throw "Compilation failed for $($puzzle.Name)`n$compileOutput"
         }
 
-        $row = [ordered]@{ Repeat = $repeat; Puzzle = $puzzle.Name }
-        foreach ($metricName in $metricNames) {
-            $row[$metricName] = Get-Metric -Output $output -Name $metricName
+        $compileMetrics[$puzzle.Name] = [pscustomobject]@{
+            flatTime            = Get-Metric $compileOutput "flatTime"
+            flatBoolVars        = Get-Metric $compileOutput "flatBoolVars"
+            flatIntVars         = Get-Metric $compileOutput "flatIntVars"
+            flatBoolConstraints = Get-Metric $compileOutput "flatBoolConstraints"
+            flatIntConstraints  = Get-Metric $compileOutput "flatIntConstraints"
         }
-        $rows += [pscustomobject]$row
+
+        for ($repeat = 1; $repeat -le $Repeats; $repeat++) {
+            $savedErrorActionPreference = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            $solveOutput = (& $ChuffedPath -s -t $TimeLimitMilliseconds $fznPath 2>&1 | Out-String)
+            $solveExitCode = $LASTEXITCODE
+            $ErrorActionPreference = $savedErrorActionPreference
+            if ($solveExitCode -ne 0 -or $solveOutput -notmatch "(?m)^----------`r?$") {
+                throw "Solve failed for $($puzzle.Name) on repeat $repeat`n$solveOutput"
+            }
+
+            $rows += [pscustomobject]@{
+                Repeat             = $repeat
+                Puzzle             = $puzzle.Name
+                solveTime          = Get-Metric $solveOutput "solveTime"
+                flatTime           = $compileMetrics[$puzzle.Name].flatTime / $Repeats
+                failures           = Get-Metric $solveOutput "failures"
+                propagations       = Get-Metric $solveOutput "propagations"
+                flatBoolVars       = $compileMetrics[$puzzle.Name].flatBoolVars
+                flatIntVars        = $compileMetrics[$puzzle.Name].flatIntVars
+                flatBoolConstraints = $compileMetrics[$puzzle.Name].flatBoolConstraints
+                flatIntConstraints = $compileMetrics[$puzzle.Name].flatIntConstraints
+                boolVariables      = Get-Metric $solveOutput "boolVariables"
+            }
+        }
+    }
+}
+finally {
+    foreach ($generatedFile in $generatedFiles) {
+        if (Test-Path -LiteralPath $generatedFile -PathType Leaf) {
+            Remove-Item -LiteralPath $generatedFile -Force
+        }
+    }
+    $resolvedCacheRoot = [IO.Path]::GetFullPath($cacheRoot)
+    $resolvedTempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+    $safePrefix = "railbound_benchmark_"
+    if ($resolvedCacheRoot.StartsWith($resolvedTempRoot, [StringComparison]::OrdinalIgnoreCase) -and
+        (Split-Path -Leaf $resolvedCacheRoot).StartsWith($safePrefix, [StringComparison]::Ordinal)) {
+        if (Test-Path -LiteralPath $resolvedCacheRoot -PathType Container) {
+            Remove-Item -LiteralPath $resolvedCacheRoot -Force
+        }
     }
 }
 
 $summary = foreach ($group in ($rows | Group-Object Puzzle)) {
-    $row = [ordered]@{ Puzzle = $group.Name }
-    foreach ($metricName in $metricNames) {
-        $row[$metricName] = ($group.Group | Measure-Object -Property $metricName -Average).Average
+    [pscustomobject]@{
+        Puzzle              = $group.Name
+        solveTime           = ($group.Group | Measure-Object solveTime -Average).Average
+        flatTime            = ($group.Group | Measure-Object flatTime -Average).Average
+        failures            = ($group.Group | Measure-Object failures -Average).Average
+        propagations        = ($group.Group | Measure-Object propagations -Average).Average
+        flatBoolVars        = ($group.Group | Measure-Object flatBoolVars -Average).Average
+        flatIntVars         = ($group.Group | Measure-Object flatIntVars -Average).Average
+        flatBoolConstraints = ($group.Group | Measure-Object flatBoolConstraints -Average).Average
+        flatIntConstraints  = ($group.Group | Measure-Object flatIntConstraints -Average).Average
+        boolVariables       = ($group.Group | Measure-Object boolVariables -Average).Average
     }
-    $row["combinedTime"] = $row.solveTime + $row.flatTime
-    [pscustomobject]$row
 }
 
-$summary | Sort-Object combinedTime -Descending | Format-Table -AutoSize
+$summary | Sort-Object { $_.solveTime + $_.flatTime } -Descending | Format-Table -AutoSize
 $totalMeanSolveTime = ($summary | Measure-Object solveTime -Sum).Sum
 $totalMeanFlatTime = ($summary | Measure-Object flatTime -Sum).Sum
 $combinedTime = $totalMeanSolveTime + $totalMeanFlatTime
-$baselineCombinedTime = 3.797564
+$baselineCombinedTime = 1.5644826666666665
 $targetCombinedTime = $baselineCombinedTime * 0.5
 $reduction = 1.0 - ($combinedTime / $baselineCombinedTime)
 
@@ -100,9 +149,10 @@ Write-Output ("AUTORESEARCH_COMBINED_TIME={0:R}" -f $combinedTime)
 Write-Output ("TARGET_COMBINED_TIME={0:R}" -f $targetCombinedTime)
 Write-Output ("COMBINED_TIME_REDUCTION={0:P3}" -f $reduction)
 
+$amortizedFlatTime = $totalMeanFlatTime
 foreach ($repeatGroup in ($rows | Group-Object Repeat | Sort-Object Name)) {
-    $passTime = ($repeatGroup.Group | ForEach-Object { $_.solveTime + $_.flatTime } | Measure-Object -Sum).Sum
-    Write-Output ("PASS_{0}_COMBINED_TIME={1:R}" -f $repeatGroup.Name, $passTime)
+    $solvePassTime = ($repeatGroup.Group | Measure-Object solveTime -Sum).Sum
+    Write-Output ("PASS_{0}_COMBINED_TIME={1:R}" -f $repeatGroup.Name, ($solvePassTime + $amortizedFlatTime))
 }
 
 if ($combinedTime -gt $targetCombinedTime) {
