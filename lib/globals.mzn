@@ -65,19 +65,6 @@ array[1..H, 1..W] of int: tunnel_exit_dir =
   | r in 1..H, c in 1..W
   ]);
 
-% 1D mapping of cells to tunnel destinations.
-array[1..(H*W)] of 1..(H*W): tunnel_dest_cell = [
-  if N_TUNNELS = 0 then idx
-  else
-    let {
-      int: r = ((idx - 1) div W) + 1;
-      int: c = ((idx - 1) mod W) + 1;
-    } in
-    (tunnel_dest_row[r, c] - 1) * W + tunnel_dest_col[r, c]
-  endif
-| idx in 1..(H*W)
-];
-
 % ==== GATE METADATA ====
 % Maps cells to gates and tracks gate placement.
 int: GATE_INDEX_UPPER = if N_GATES = 0 then 1 else N_GATES endif; % Bounds gate index lookup.
@@ -106,9 +93,6 @@ array[1..H, 1..W] of bool: cell_has_eswitch =
 
 % ==== STATION METADATA ====
 % Maps cells to stations and tracks their placement.
-int: STATION_INDEX_UPPER = if N_STATIONS = 0 then 1 else N_STATIONS endif; % Bounds station index lookup.
-array[1..H, 1..W] of 1..STATION_INDEX_UPPER: station_index_at =
-  array2d(1..H, 1..W, [ let { int: st_idx = if N_STATIONS = 0 then 0 else sum(st in 1..N_STATIONS where STATIONS[st].1 = r /\ STATIONS[st].2 = c)(st) endif; } in if st_idx > 0 then st_idx else 1 endif | r in 1..H, c in 1..W ]);
 array[1..H, 1..W] of bool: cell_has_station =
   array2d(1..H, 1..W, [ let { int: count = if N_STATIONS = 0 then 0 else sum(st in 1..N_STATIONS where STATIONS[st].1 = r /\ STATIONS[st].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
 
@@ -119,15 +103,6 @@ array[1..H, 1..W] of bool: cell_is_init =
     int: init_count = if N_INIT_POS = 0 then 0 else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(1) endif;
     int: tunnel_count = if N_TUNNELS = 0 then 0 else sum(i in 1..N_TUNNELS where (TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c) \/ (TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c))(1) endif;
   } in init_count > 0 \/ tunnel_count > 0 | r in 1..H, c in 1..W ]);
-
-% Boolean grid indicating which cells statically contain ROCK.
-array[1..H, 1..W] of bool: cell_is_rock =
-  array2d(1..H, 1..W, [
-    if N_INIT_POS = 0 then false
-    else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(bool2int(INIT_POS[i].3 == ROCK)) > 0
-    endif
-  | r in 1..H, c in 1..W
-  ]);
 
 % ==== ROUTING PERMISSION TABLES ====
 % can_enter[p, d]: true if a train entering from direction d can enter piece p.
@@ -216,7 +191,6 @@ array[Piece, Dir] of bool: can_exit = array2d(Piece, Dir, [
 % can_connect[p, d]: true if direction d is relevant to piece p (entry or exit possible).
 % Used for routing validation and connectivity checks.
 array[Piece, Dir] of bool: can_connect = array2d(Piece, Dir, [can_enter[p, d] \/ can_exit[p, d] | p in Piece, d in Dir]);
-array[Dir] of set of Piece: CONNECTS_DIR = [ { p | p in Piece where can_connect[p, d] } | d in Dir ];
 
 % exit_of[p, d]: Determines the exit direction when entering piece p from direction d.
 % Core routing: determines where a train ends up after traversing piece p.
