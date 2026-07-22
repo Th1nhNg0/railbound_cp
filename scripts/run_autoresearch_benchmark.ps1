@@ -90,7 +90,21 @@ $summary | Sort-Object combinedTime -Descending | Format-Table -AutoSize
 $totalMeanSolveTime = ($summary | Measure-Object solveTime -Sum).Sum
 $totalMeanFlatTime = ($summary | Measure-Object flatTime -Sum).Sum
 $combinedTime = $totalMeanSolveTime + $totalMeanFlatTime
+$baselineCombinedTime = 3.797564
+$targetCombinedTime = $baselineCombinedTime * 0.5
+$reduction = 1.0 - ($combinedTime / $baselineCombinedTime)
 
 Write-Output ("TOTAL_MEAN_SOLVE_TIME={0:R}" -f $totalMeanSolveTime)
 Write-Output ("TOTAL_MEAN_FLAT_TIME={0:R}" -f $totalMeanFlatTime)
 Write-Output ("AUTORESEARCH_COMBINED_TIME={0:R}" -f $combinedTime)
+Write-Output ("TARGET_COMBINED_TIME={0:R}" -f $targetCombinedTime)
+Write-Output ("COMBINED_TIME_REDUCTION={0:P3}" -f $reduction)
+
+foreach ($repeatGroup in ($rows | Group-Object Repeat | Sort-Object Name)) {
+    $passTime = ($repeatGroup.Group | ForEach-Object { $_.solveTime + $_.flatTime } | Measure-Object -Sum).Sum
+    Write-Output ("PASS_{0}_COMBINED_TIME={1:R}" -f $repeatGroup.Name, $passTime)
+}
+
+if ($combinedTime -gt $targetCombinedTime) {
+    throw "50% reduction target missed: $combinedTime > $targetCombinedTime"
+}
