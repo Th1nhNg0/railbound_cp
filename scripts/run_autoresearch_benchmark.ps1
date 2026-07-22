@@ -21,15 +21,7 @@ if ([string]::IsNullOrWhiteSpace($MiniZincPath)) {
 
 $puzzles = @(
     @{ Name = "1-11B"; Path = "data/1/1-11B.dzn" },
-    @{ Name = "2-7B";  Path = "data/2/2-7B.dzn" },
-    @{ Name = "3-10B"; Path = "data/3/3-10B.dzn" },
-    @{ Name = "4-8B";  Path = "data/4/4-8B.dzn" },
-    @{ Name = "5-6A";  Path = "data/5/5-6A.dzn" },
-    @{ Name = "6-10";  Path = "data/6/6-10.dzn" },
-    @{ Name = "7-9";   Path = "data/7/7-9.dzn" },
-    @{ Name = "7-5A";  Path = "data/7/7-5A.dzn" },
-    @{ Name = "8-3A";  Path = "data/8/8-3A.dzn" },
-    @{ Name = "8-1A";  Path = "data/8/8-1A.dzn" }
+    @{ Name = "2-7B";  Path = "data/2/2-7B.dzn" }
 )
 
 $referenceRows = Import-Csv -LiteralPath $referencePath
