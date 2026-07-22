@@ -8,11 +8,9 @@
 % ==== TRACK LIMIT CONSTRAINT ====
 % Ensures the number of placed tracks does not exceed MAX_TRACKS.
 % Counts only non-empty, non-initial, non-tunnel cells as placed tracks.
-int: INIT_EMPTY = W*H - (N_INIT_POS + 2 * N_TUNNELS); % Initial empty count.
-constraint
-  INIT_EMPTY - sum(r in 1..H, c in 1..W)(
-      bool2int(grid[r, c] == EMPTY)
-    ) <= MAX_TRACKS; % Placed tracks ≤ limit.
+constraint sum(r in 1..H, c in 1..W where not cell_is_init[r, c])(
+  bool2int(grid[r, c] != EMPTY)
+) <= MAX_TRACKS;
 
 % ==== INITIAL POSITION CONSTRAINT ====
 % Pre-placed pieces from INIT_POS must appear exactly as specified.
@@ -42,20 +40,11 @@ constraint forall(r in 1..H, c in 1..W where not cell_is_init[r, c])(
     grid[r, c] in PLACEABLE_SET
 );
 
-% ==== TRAIN PATH VALIDITY ====
-% Trains move only on valid track (not EMPTY, not ROCK).
-constraint forall(t in 1..N_TRAINS, i in 1..arrival_time[t])(
-    grid[train_row[t, i], train_col[t, i]] != EMPTY /\
-    grid[train_row[t, i], train_col[t, i]] != ROCK % Valid track required.
-);
-
 % ==== CONNECTIVITY CONSTRAINT ====
 % Manually placed pieces must connect to neighbors (preventing floating tracks).
 % Allows dead-ends (useful for decoy parking): switches require >= 2 connections; corners and straights >= 1.
-constraint forall(r in 1..H, c in 1..W)(
-  (((grid[r, c] in SWITCHES_SET) \/ (grid[r, c] in CORNERS_SET) \/ (grid[r, c] in STRAIGHTS_SET)) /\
-  not cell_is_init[r, c]) % Only if manually placed.
-  ->
+constraint forall(r in 1..H, c in 1..W where not cell_is_init[r, c])(
+  grid[r, c] != EMPTY ->
   sum(d in Dir)(
     let {
       0..H+1: nr = r + dr[d];
@@ -70,9 +59,3 @@ constraint forall(r in 1..H, c in 1..W)(
   ) >= (if grid[r, c] in SWITCHES_SET then 2 else 1 endif)
 );
 
-% ==== PLACED PIECE USAGE CONSTRAINT ====
-% Manually placed pieces must be traversed by at least one train or decoy.
-constraint forall(r in 1..H, c in 1..W)(
- grid[r,c] != EMPTY /\ not cell_is_init[r, c] -> exists(t in 1..N_TRAINS, i in 1..arrival_time[t])(train_row[t,i]=r /\ train_col[t,i]=c)
- \/ exists(d in 1..N_DECOYS, i in 1..MAX_TIME)(decoy_row[d,i]=r /\ decoy_col[d,i]=c)
-);

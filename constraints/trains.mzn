@@ -127,6 +127,11 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME where time >= arrival_ti
 
 % ==== SEQUENTIAL ARRIVAL ====
 % Trains must arrive in order (train 1, then 2, etc.).
+constraint forall(t in 1..N_TRAINS) (
+  arrival_time[t] >= t /\
+  arrival_time[t] <= MAX_TIME - (N_TRAINS - t)
+);
+
 constraint forall(t in 1..N_TRAINS-1) (
   arrival_time[t] < arrival_time[t+1] % Strict ordering.
 );
@@ -140,10 +145,15 @@ constraint forall(t1 in 1..N_TRAINS, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME wh
 % ==== NO POSITION SWAPS ====
 % Trains cannot swap positions between consecutive timesteps (including tunnels).
 constraint forall(t1 in 1..N_TRAINS-1, t2 in t1 + 1..N_TRAINS, i in 1..MAX_TIME-1 where i < arrival_time[t1])(
-    (tunnel_dest_row[train_row[t1, i], train_col[t1, i]] != train_row[t2, i+1] \/
-     tunnel_dest_col[train_row[t1, i], train_col[t1, i]] != train_col[t2, i+1]) \/
-    (tunnel_dest_row[train_row[t2, i], train_col[t2, i]] != train_row[t1, i+1] \/
-     tunnel_dest_col[train_row[t2, i], train_col[t2, i]] != train_col[t1, i+1])
+    if N_TUNNELS = 0 then
+      (train_row[t1, i] != train_row[t2, i+1] \/ train_col[t1, i] != train_col[t2, i+1]) \/
+      (train_row[t2, i] != train_row[t1, i+1] \/ train_col[t2, i] != train_col[t1, i+1])
+    else
+      (tunnel_dest_row[train_row[t1, i], train_col[t1, i]] != train_row[t2, i+1] \/
+       tunnel_dest_col[train_row[t1, i], train_col[t1, i]] != train_col[t2, i+1]) \/
+      (tunnel_dest_row[train_row[t2, i], train_col[t2, i]] != train_row[t1, i+1] \/
+       tunnel_dest_col[train_row[t2, i], train_col[t2, i]] != train_col[t1, i+1])
+    endif
 );
 
 
