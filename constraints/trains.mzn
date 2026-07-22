@@ -127,6 +127,11 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME where time >= arrival_ti
 
 % ==== SEQUENTIAL ARRIVAL ====
 % Trains must arrive in order (train 1, then 2, etc.).
+constraint forall(t in 1..N_TRAINS) (
+  arrival_time[t] >= t /\
+  arrival_time[t] <= MAX_TIME - (N_TRAINS - t)
+);
+
 constraint forall(t in 1..N_TRAINS-1) (
   arrival_time[t] < arrival_time[t+1] % Strict ordering.
 );
