@@ -630,98 +630,138 @@ class Railbound:
 
     # ------------------------------------------------------- movement ----
     def heading(self, v, t, moved):
-        """hd[v,t] = exit on entry if moved into the cell at t, else hd[v,t-1]."""
+        """hd[v,t] = exit on entry if moved into the cell at t, else hd[v,t-1].
+
+        pc[x]: the vehicle stands on a cell routing like piece x (an element
+        constraint grid[pos] = x in one-hot form); heading follows from pc and
+        the entry side, which keeps the clause count per step small.
+        """
         N = self.N
-        for p in range(1, N + 1):
-            if (v, t, p) not in self.at:
-                continue
+        cells = [p for p in range(1, N + 1) if (v, t, p) in self.at]
+        pieces = sorted({x for p in cells for x in self.eff_pieces(p)})
+        pc = {x: self.new() for x in pieces}
+        self.m.AddAtMostOne(list(pc.values()))
+        for p in cells:
             for x in self.eff_pieces(p):
                 lx = self.eff_lit(p, t, x)
-                if lx is False:
-                    continue
-                for d in range(4):
-                    self.implies([moved, self.at[v, t, p], self.en[v, t, d], lx], [self.hd[v, t, EXIT_OF[x][d]]])
+                if lx is not False:
+                    self.clause([self.at[v, t, p].Not(), self.neg(lx), pc[x]])
+        for x in pieces:
+            for d in range(4):
+                self.implies([moved, self.en[v, t, d], pc[x]], [self.hd[v, t, EXIT_OF[x][d]]])
         for e in range(4):
             self.implies([self.neg(moved), self.hd[v, t - 1, e]], [self.hd[v, t, e]])
+
+    def intent(self, v, tau):
+        """One-hot literals for the cell the vehicle's track leads to (nx, 0 =
+        off the board / closed tunnel) and the side it would enter from (nie),
+        plus the (cell, heading, target) contexts they come from."""
+        ctx, nx, nie = [], {}, {}
+        for p in range(1, self.N + 1):
+            if (v, tau, p) not in self.at:
+                continue
+            for e in range(4):
+                h = self.hd[v, tau, e]
+                if h is not False:
+                    ctx.append((p, e, self.move_cell[p][e], self.move_entry[p][e], h))
+        for p, e, q, d, h in ctx:
+            if q not in nx:
+                nx[q] = self.new()
+            if d not in nie:
+                nie[d] = self.new()
+            self.implies([self.at[v, tau, p], h], [nx[q], nie[d]])
+        self.m.AddAtMostOne(list(nx.values()))
+        self.m.AddAtMostOne(list(nie.values()))
+        pairs = {(q, d) for _, _, q, d, _ in ctx}
+        return ctx, nx, nie, pairs
 
     def movement(self):
         T, N, NT = self.T, self.N, self.NT
         AT = self.AT
         for v in range(self.NV):
-            if not hasattr(self, "crashed"):
-                self.crashed = {}
             is_train = v < NT
-            p0, d0 = self.starts[v]
             for tau in range(0, T):
                 t1 = tau + 1
                 act = self.active[v, tau] if is_train else True
                 waiting = self.wait.get((v, tau), False) if tau >= 1 else False
-                # contexts: (cell, heading) the vehicle is in at tau
-                ctx = []
-                for p in range(1, N + 1):
-                    if (v, tau, p) not in self.at:
-                        continue
-                    for e in range(4):
-                        h = self.hd[v, tau, e]
-                        if h is False:
-                            continue
-                        ctx.append((p, e, self.and_var([self.at[v, tau, p], h])))
+                ctx, nx, nie, pairs = self.intent(v, tau)
+                cur = [p for p in range(1, N + 1) if (v, tau, p) in self.at]
                 if is_train:
                     stay = self.new()
-                    for p, e, c in ctx:
-                        ip, ied = self.move_cell[p][e], self.move_entry[p][e]
-                        prem = [act, self.neg(waiting), c]
-                        if ip == 0:
-                            self.clause([self.neg(l) for l in prem])
+                    prem = [act, self.neg(waiting)]
+                    for q, lit in nx.items():
+                        if q == 0:                       # trains may not leave the board
+                            self.clause([self.neg(l) for l in prem + [lit]])
                             continue
-                        self.implies(prem, [self.enterable[ip, ied]])
-                        b = self.blk[ip, t1]
-                        self.implies(prem, [self.eq_lit(stay, b)])
-                        self.implies(prem + [self.neg(b)], [AT(v, t1, ip), self.en[v, t1, ied]])
+                        b = self.blk[q, t1]
+                        self.implies(prem + [lit, b], [stay])
+                        self.implies(prem + [lit, self.neg(b)], [self.neg(stay)])
+                        self.implies(prem + [self.neg(stay), lit], [AT(v, t1, q)])
+                    for q, d in pairs:
+                        if q:
+                            self.implies(prem + [nx[q], nie[d]], [self.enterable[q, d]])
+                    for d, lit in nie.items():
+                        self.implies(prem + [self.neg(stay), lit], [self.en[v, t1, d]])
                         if tau == 0:
-                            self.implies(prem + [b], [self.en[v, t1, ied]])
+                            self.implies(prem + [stay, lit], [self.en[v, t1, d]])
                     self.implies([act, waiting], [stay])
-                    if tau >= 1 or True:
-                        for p in range(1, N + 1):
-                            if (v, tau, p) in self.at:
-                                self.implies([act, stay, self.at[v, tau, p]], [AT(v, t1, p)])
-                        if tau >= 1:
-                            for d in range(4):
-                                self.implies([act, stay, self.en[v, tau, d]], [self.en[v, t1, d]])
+                    for p in cur:
+                        self.implies([act, stay, self.at[v, tau, p]], [AT(v, t1, p)])
+                    if tau >= 1:
+                        for d in range(4):
+                            self.implies([act, stay, self.en[v, tau, d]], [self.en[v, t1, d]])
                     moved = self.and_var([act, self.neg(stay)])
                     self.heading(v, t1, moved)
                 else:
-                    cr = self.neg(self._decoy_crash_lit(v, tau))          # crashed at tau
+                    cr = self.neg(self._decoy_crash_lit(v, tau))      # crashed by tau
                     cr_next = self.neg(self._decoy_crash_lit(v, t1))
-                    STL, VAL, OCC = self.new(), self.new(), self.new()
-                    d_idx = v - NT
-                    for p, e, c in ctx:
-                        ip, ied = self.move_cell[p][e], self.move_entry[p][e]
-                        on_track = True if tau == 0 else self.nonempty[p]
-                        if ip == 0:
-                            self.implies([c], [self.neg(STL), self.neg(VAL), self.neg(OCC)])
+                    STL, ENT, OCCQ = self.new(), self.new(), self.new()
+                    for q, lit in nx.items():
+                        b = self.blk[q, t1] if q else False
+                        self.implies([lit], [self.eq_lit(STL, b)])
+                        if q == 0:
+                            self.implies([lit], [self.neg(ENT), self.neg(OCCQ)])
                             continue
-                        self.implies([c], [self.eq_lit(STL, self.blk[ip, t1])])
-                        self.implies([c], [self.eq_lit(VAL, self.and_var([on_track, self.enterable[ip, ied]]))])
-                        occ = [self.and_var([self.active[t, tau], AT(t, t1, ip)]) for t in range(NT)]
+                        occ = [self.and_var([self.active[t, tau], AT(t, t1, q)]) for t in range(NT)]
                         for v2 in range(NT, self.NV):
                             if v2 < v:
-                                occ.append(AT(v2, t1, ip))
+                                occ.append(AT(v2, t1, q))
                             elif v2 > v:
-                                toward = self.or_var([self.hd[v2, tau, e2] for e2 in range(4)
-                                                      if self.move_cell[ip][e2] == p])
-                                occ.append(self.and_var([AT(v2, tau, ip), self.or_var([AT(v2, t1, ip), toward])]))
-                        self.implies([c], [self.eq_lit(OCC, self.or_var(occ))])
-                        M = self.and_var([self.neg(cr), self.neg(waiting), self.neg(STL), VAL, self.neg(OCC)])
-                        self.implies([c, M], [AT(v, t1, ip), self.en[v, t1, ied]])
-                        if tau == 0:
-                            self.implies([c, self.neg(M)], [self.en[v, t1, ied]])
+                                occ.append(self.and_var([AT(v2, tau, q), AT(v2, t1, q)]))
+                        self.implies([lit], [self.eq_lit(OCCQ, self.or_var(occ))])
+                    for q, d in pairs:
+                        if q:
+                            self.implies([nx[q], nie[d]], [self.eq_lit(ENT, self.enterable[q, d])])
+                    if tau == 0:
+                        cne = True
+                    else:
+                        cne = self.new()
+                        for p in cur:
+                            self.implies([self.at[v, tau, p]], [self.eq_lit(cne, self.nonempty[p])])
+                    # head-on with a later decoy standing on the target cell and heading back
+                    head = []
+                    for p, e, q, d, h in ctx:
+                        if not q:
+                            continue
+                        for v2 in range(v + 1, self.NV):
+                            toward = self.or_var([self.hd[v2, tau, e2] for e2 in range(4)
+                                                  if self.move_cell[q][e2] == p])
+                            if toward is not False and AT(v2, tau, q) is not False:
+                                head.append(self.and_var([self.at[v, tau, p], h, AT(v2, tau, q), toward]))
+                    OCC = self.or_var([OCCQ, self.or_var(head)])
+                    VAL = self.and_var([cne, ENT])
                     M = self.and_var([self.neg(cr), self.neg(waiting), self.neg(STL), VAL, self.neg(OCC)])
+                    for q, lit in nx.items():
+                        if q:
+                            self.implies([M, lit], [AT(v, t1, q)])
+                    for d, lit in nie.items():
+                        self.implies([M, lit], [self.en[v, t1, d]])
+                        if tau == 0:
+                            self.implies([self.neg(M), lit], [self.en[v, t1, d]])
                     crash_now = self.and_var([self.neg(waiting), self.neg(STL), self.or_var([self.neg(VAL), OCC])])
                     self.eq(cr_next, self.or_var([cr, crash_now]))
-                    for p in range(1, N + 1):
-                        if (v, tau, p) in self.at:
-                            self.implies([self.neg(M), self.at[v, tau, p]], [AT(v, t1, p)])
+                    for p in cur:
+                        self.implies([self.neg(M), self.at[v, tau, p]], [AT(v, t1, p)])
                     if tau >= 1:
                         for d in range(4):
                             self.implies([self.neg(M), self.en[v, tau, d]], [self.en[v, t1, d]])

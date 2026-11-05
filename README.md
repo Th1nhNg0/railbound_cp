@@ -59,6 +59,7 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 - `data/` – MiniZinc `.dzn` instances for each campaign puzzle currently modeled.
 - `convert_levels.py` – Converts the legacy `levels.json` dump into `.dzn` files.
 - `scripts/solve.py` – Runs both search orders in parallel and prints the first solution.
+- `cpsat/railbound_cpsat.py` – OR-Tools CP-SAT solver (same model, Boolean encoding).
 - `scripts/crosscheck_cpp.py` – Checks that every board found by the RailboundSolver C++ simulator is accepted by this model.
 - `images/` – Static artwork shipped with the project (used in documentation).
 - `docs/` – Reference assets such as the cover image and gameplay animation embedded above.
@@ -97,6 +98,14 @@ If you're crafting your own `.dzn` instances, see the data schema in [docs/data_
   ```
   A single order can be chosen with `-D "SEARCH=2;"` on the plain `minizinc` command.
 - The output shows the solved board, track usage, and each train's path as `(row,col)` cells. Add `--output-mode json` to get the raw decision variables (e.g. for `viz.html`).
+
+**CP-SAT (fastest)**
+
+`cpsat/railbound_cpsat.py` is a Boolean port of the same model for Google OR-Tools CP-SAT (`pip install ortools`). It reads the same `.dzn` files:
+```bash
+python cpsat/railbound_cpsat.py data/8/8-1.dzn --time-limit 60 --workers 4
+```
+On the 181 bundled levels (4 workers, 60 s per level) it solves 176, versus 173 for the MiniZinc portfolio. Its solutions are accepted by `main.mzn`, and it accepts the boards found by the RailboundSolver C++ simulator. `--pin board.json` checks a given board, `--json` prints machine-readable output, and `--deepen` tries shorter horizons first.
 
 **MiniZinc IDE**
 
