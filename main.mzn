@@ -113,6 +113,16 @@ include "constraints/eswitches.mzn";
 include "constraints/semaphores.mzn";
 include "constraints/stations.mzn";
 
-solve satisfy;
+% ==== SEARCH ====
+% Try the earliest arrival schedule first, then build each train's route step
+% by step (train by train, in time order).  Given the grid, movement is
+% deterministic, so committing to a path lets propagation lay the track the
+% path needs; remaining grid cells are filled last.  On the benchmark suite
+% this solves far more of the large levels than the solver's default order.
+solve :: seq_search([
+  int_search(arrival_time, input_order, indomain_min),
+  int_search([train_pos[t, i] | t in 1..N_TRAINS, i in 1..MAX_TIME], input_order, indomain_min),
+  int_search(grid_flat, input_order, indomain_min)
+]) satisfy;
 
 include "formatting.mzn";
