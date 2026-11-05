@@ -58,6 +58,7 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 - `formatting.mzn` – Solution output (board, track usage, and train/decoy paths).
 - `data/` – MiniZinc `.dzn` instances for each campaign puzzle currently modeled.
 - `convert_levels.py` – Converts the legacy `levels.json` dump into `.dzn` files.
+- `scripts/solve.py` – Runs both search orders in parallel and prints the first solution.
 - `images/` – Static artwork shipped with the project (used in documentation).
 - `docs/` – Reference assets such as the cover image and gameplay animation embedded above.
 - `viz.html` – Lightweight viewer that turns solver output into an interactive grid.
@@ -67,7 +68,7 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 
 Board cells are addressed by a single row-major index `cell(r, c) = (r - 1) * W + c`, so each vehicle has one position variable per timestep. Collision, swap, station, and activation checks are single integer comparisons, and moving to the next cell (including tunnel teleports) is one lookup in the precomputed `move_cell` / `move_entry` tables. Switch toggles and gate/semaphore blocking are computed once per cell and timestep and shared by every train and decoy.
 
-The search annotation in `main.mzn` tries the earliest arrival schedule first and then builds each train's route step by step. On the 181 bundled levels (Chuffed, 60 s limit) this solves 171 levels versus 155 for the solver's default order.
+`main.mzn` offers two search orders: `SEARCH=1` (train-major: earliest arrivals, then each train's route in turn) and `SEARCH=2` (time-major: all trains advance together one step at a time, nearest-to-target cell first). Neither wins everywhere, so `scripts/solve.py` races both. On the 181 bundled levels (Chuffed, 60 s limit) the portfolio solves 173 levels, versus 155 for the original model with the solver's default order.
 
 ## Installation
 
@@ -89,6 +90,11 @@ If you're crafting your own `.dzn` instances, see the data schema in [docs/data_
   ```bash
   minizinc --solver chuffed main.mzn data/8/8-1.dzn
   ```
+- Or race both search orders and keep the first answer (recommended):
+  ```bash
+  python scripts/solve.py data/8/8-1.dzn --time-limit 60
+  ```
+  A single order can be chosen with `-D "SEARCH=2;"` on the plain `minizinc` command.
 - The output shows the solved board, track usage, and each train's path as `(row,col)` cells. Add `--output-mode json` to get the raw decision variables (e.g. for `viz.html`).
 
 **MiniZinc IDE**

@@ -114,15 +114,35 @@ include "constraints/semaphores.mzn";
 include "constraints/stations.mzn";
 
 % ==== SEARCH ====
-% Try the earliest arrival schedule first, then build each train's route step
-% by step (train by train, in time order).  Given the grid, movement is
-% deterministic, so committing to a path lets propagation lay the track the
-% path needs; remaining grid cells are filled last.  On the benchmark suite
-% this solves far more of the large levels than the solver's default order.
-solve :: seq_search([
+% Two complementary orders; pick one with -D "SEARCH=1;" or "SEARCH=2;"
+% (default 1).  scripts/solve.py runs both in parallel and keeps the first
+% answer, since neither order dominates across the campaign.
+%
+%  1 (train-major): earliest arrival schedule first, then each train's route
+%    step by step, one train after another.  Best on large boards where
+%    trains interact little (most of world 8).
+%  2 (time-major): advance all trains together one timestep at a time, like a
+%    game simulation, trying the cell closest to the target first.  Best when
+%    trains must cooperate through gates, decoys or semaphores (e.g. 3-11B,
+%    7-5A).
+% Given the grid, movement is deterministic, so committing to positions lets
+% propagation lay the track the route needs; remaining cells are filled last.
+opt int: SEARCH;
+int: SEARCH_ORDER = if occurs(SEARCH) then deopt(SEARCH) else 1 endif;
+constraint assert(SEARCH_ORDER in 1..2, "SEARCH must be 1 or 2");
+
+ann: train_major = seq_search([
   int_search(arrival_time, input_order, indomain_min),
   int_search([train_pos[t, i] | t in 1..N_TRAINS, i in 1..MAX_TIME], input_order, indomain_min),
   int_search(grid_flat, input_order, indomain_min)
-]) satisfy;
+]);
+ann: time_major = seq_search([
+  int_search([ if k = 1 then dist_to_target[train_pos[t, i]] else train_pos[t, i] endif
+             | i in 1..MAX_TIME, t in 1..N_TRAINS, k in 1..2 ], input_order, indomain_min),
+  int_search(arrival_time, input_order, indomain_min),
+  int_search(grid_flat, input_order, indomain_min)
+]);
+
+solve :: if SEARCH_ORDER = 1 then train_major else time_major endif satisfy;
 
 include "formatting.mzn";
