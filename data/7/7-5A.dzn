@@ -1,9 +1,10 @@
 W=8;
 H=8;
 
-% smaller MAX_TIME will make the decoy go to the target but limited by MAX_TIME -> wrong answer
 MAX_TIME=18;
 MAX_TRACKS=18;
+SEMAPHORE_SUPPLY=0;
+FIXED_SEMAPHORES=[];
 
 TARGET=(5,8);
 
@@ -46,5 +47,3 @@ DSWITCHES=[
 (6,5,1),
 ];
 STATIONS=[];
-
-SEMAPHORE_SUPPLY=0;

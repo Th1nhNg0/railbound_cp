@@ -21,6 +21,7 @@ Options:
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Dict, Any, Tuple, List
@@ -44,7 +45,7 @@ BOARD_TO_TRACK: Dict[int, str | None] = {
     8: "CORNER_TL",  # TOP_LEFT_TURN
     9: "SWITCH_L_R_D",  # BOTTOM_RIGHT_LEFT_3WAY
     10: "SWITCH_T_D_R",  # BOTTOM_RIGHT_TOP_3WAY
-    11: "SWITCH_L_R_D",  # BOTTOM_LEFT_RIGHT_3WAY
+    11: "SWITCH_R_L_D",  # BOTTOM_LEFT_RIGHT_3WAY
     12: "SWITCH_T_D_L",  # BOTTOM_LEFT_TOP_3WAY
     13: "SWITCH_L_R_T",  # TOP_RIGHT_LEFT_3WAY
     14: "SWITCH_D_T_R",  # TOP_RIGHT_BOTTOM_3WAY
@@ -74,6 +75,7 @@ MOD_OPEN_GATE = 4
 MOD_SWAPPING_TRACK = 5  # Corresponds to DSWITCH
 MOD_STATION = 6
 MOD_SWITCH_RAIL = 7  # Corresponds to ESWITCH
+MOD_SEMAPHORE = 8  # Pre-placed semaphore
 MOD_STARTING_CAR = 10
 
 # Mapping from JSON direction strings to MiniZinc `Dir` enum strings.
@@ -245,6 +247,14 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
                 minizinc_train_id = mod_nums[r][c] + 1
                 stations.append((r + 1, c + 1, minizinc_train_id))
 
+    # --- Collect pre-placed semaphores ---
+    fixed_semaphores: List[Tuple[int, int]] = [
+        (r + 1, c + 1)
+        for r, row in enumerate(mods)
+        for c, mod_val in enumerate(row)
+        if mod_val == MOD_SEMAPHORE
+    ]
+
     # --- Assemble .dzn Content ---
     lines = [
         f"W={W};",
@@ -253,6 +263,7 @@ def convert_level(level_name: str, level_data: Dict[str, Any]) -> str:
         "MAX_TIME=W*H;",
         f"MAX_TRACKS={tracks};",
         f"SEMAPHORE_SUPPLY={semaphore_supply};",
+        "FIXED_SEMAPHORES=[" + ",".join(f"({r},{c})" for r, c in fixed_semaphores) + "];",
         "",
         f"TARGET=({target[0]},{target[1]});",
         "",
@@ -338,6 +349,7 @@ def main():
 Examples:
   python convert_levels.py           # Convert only missing levels
   python convert_levels.py --force   # Force convert all levels
+  python convert_levels.py -f --keep-max-time   # Refresh all, keep tuned horizons
         """,
     )
     parser.add_argument(
@@ -359,6 +371,12 @@ Examples:
         type=Path,
         default="data",
         help="Directory to save the output .dzn files.",
+    )
+    parser.add_argument(
+        "--keep-max-time",
+        action="store_true",
+        help="When overwriting, keep the MAX_TIME line of the existing .dzn file\n"
+        "(horizons are tuned by hand; the converter default is W*H).",
     )
     parser.add_argument(
         "--level-prefix",
@@ -415,6 +433,10 @@ Examples:
                 continue
 
             dzn_content = convert_level(level_name, level_data)
+            if args.keep_max_time and output_path.exists():
+                old = re.search(r"^MAX_TIME\s*=.*;$", output_path.read_text(), re.M)
+                if old:
+                    dzn_content = re.sub(r"^MAX_TIME=.*;$", lambda _: old.group(0), dzn_content, flags=re.M)
             output_path.write_text(dzn_content)
             converted += 1
             if converted > 0 and converted % 10 == 0:

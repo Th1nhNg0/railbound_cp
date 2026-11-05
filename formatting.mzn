@@ -23,7 +23,7 @@ output [
   ["\nDECOY PATHS:\n"] ++ [
     "Decoy \(d):\n  Path: " ++ join(" ", [ show_cell(fix(decoy_pos[d, i])) | i in 0..MAX_TIME ]) ++ "\n"
   | d in 1..N_DECOYS ]
-endif) ++ (if SEMAPHORE_SUPPLY = 0 then [] else
+endif) ++ (if not HAS_SEMAPHORES then [] else
   ["\nSEMAPHORES:"] ++
   [ " (\(r),\(c)) opens at t=\(semaphore_open_time[r, c])" | r in 1..H, c in 1..W where fix(semaphore_present[r, c]) ] ++
   ["\n"]

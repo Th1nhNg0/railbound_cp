@@ -22,6 +22,7 @@ array[int] of tuple(int, int, int): ACTIVATIONS; % Activation cells: (row, col, 
 array[int] of tuple(int, int, int): DSWITCHES; % Dynamic switches: (row, col, activation_id).
 array[int] of tuple(int, int, int): STATIONS; % Stations: (row, col, train_id).
 int: SEMAPHORE_SUPPLY; % Available semaphore placements the player can use.
+array[int] of tuple(int, int): FIXED_SEMAPHORES; % Semaphores pre-placed by the level (not counted in the supply).
 
 % ==== DERIVED COUNTS (computed from input) ====
 int: N_TRAINS = length(TRAINS);          % Number of player trains to solve for.
@@ -75,9 +76,19 @@ array[1..H, 1..W] of var 0..(MAX_TIME + 1): semaphore_open_time;
 
 % ==== DERIVED PER-CELL STATE (shared by trains and decoys) ====
 
-% Cells that may host a semaphore (gate and activation tiles keep their overlay).
+% Cells that may host a semaphore: any straight or corner tile without another
+% feature (gate, activation tile, station, tunnel, car start or the target).
+array[CELLS] of bool: fixed_semaphore = [
+  exists(i in index_set(FIXED_SEMAPHORES))(cell(FIXED_SEMAPHORES[i].1, FIXED_SEMAPHORES[i].2) = p) | p in CELLS ];
+bool: HAS_SEMAPHORES = SEMAPHORE_SUPPLY > 0 \/ length(FIXED_SEMAPHORES) > 0;
 array[CELLS] of bool: semaphore_candidate = [
-  SEMAPHORE_SUPPLY > 0 /\ gate_at[p] = 0 /\ not is_activation_cell[p] | p in CELLS ];
+  fixed_semaphore[p] \/
+  SEMAPHORE_SUPPLY > 0 /\ gate_at[p] = 0 /\ not is_activation_cell[p] /\
+  not is_tunnel_cell[p] /\ p != TARGET_CELL /\
+  not exists(st in 1..N_STATIONS)(cell(STATIONS[st].1, STATIONS[st].2) = p) /\
+  not exists(t in 1..N_TRAINS)(cell(TRAINS[t].1, TRAINS[t].2) = p) /\
+  not exists(d in 1..N_DECOYS)(cell(DECOYS[d].1, DECOYS[d].2) = p)
+| p in CELLS ];
 
 % effective_piece[p, t]: routing of cell p at time t, i.e. the placed piece
 % with any dynamic / exit-triggered switch toggle applied.  Switch cells are
@@ -89,6 +100,11 @@ array[CELLS, 0..MAX_TIME] of var Piece: effective_piece = array2d(CELLS, 0..MAX_
     (if eswitch_toggled[eswitch_at[p], t] then switch_toggle[init_piece[p]] else init_piece[p] endif)
   else grid_flat[p] endif
 | p in CELLS, t in 0..MAX_TIME ]);
+
+% Whether any switch changes routing during the run.  Only then can a vehicle
+% waiting on a cell see its exit change, which the heading variables below
+% guard against (a vehicle keeps the exit it got when it entered the cell).
+bool: SWITCHES_TOGGLE = N_DSWITCHES + N_ESWITCHES > 0;
 
 % blocked[p, t]: entering cell p on the move that lands at time t is refused
 % by a closed gate or a semaphore that has not opened yet.  Cell 0 (off-board)

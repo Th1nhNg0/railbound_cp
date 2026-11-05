@@ -35,17 +35,17 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 
 **Train movement** – A discrete time horizon tracks every train. Sequential arrival rules are enforced by ordering constraints so that cars couple with the locomotive in the intended order.
 
-**Switch logic** – Deterministic, dynamic (`DSWITCH`), and exit-triggered (`ESWITCH`) switches toggle based on train visits. Auxiliary Boolean variables encode state transitions and prevent impossible diverge/converge sequences.
+**Switch logic** – Deterministic switches route by entry side. Dynamic switches (`DSWITCH`) flip when an activation tile of their group is entered; exit-triggered switches (`ESWITCH`, the game's switch rails) flip each time a vehicle arrives on them. A vehicle keeps the exit it was given when it entered a cell, even if the switch flips while it waits there.
 
 **Gates and activators** – Gates listen to activation tiles that flip after a train crosses them. Timing constraints ensure a gate is open when a train reaches it and closed otherwise.
 
 **Stations** – Stations are indexed as `(row, col, train_id)`. Each train must visit all assigned stations before termination and incurs a two-step dwell time the first time it arrives at any of its stations.
 
-**Tunnels** – Paired entrance-exit cells are linked with equality constraints so that entering at `(r₁, c₁)` instantly re-emerges at `(r₂, c₂)` on the same time step.
+**Tunnels** – Driving into a tunnel mouth puts the vehicle directly on the paired tunnel tile, facing out of it; the next step leaves through that mouth.
 
-**Decoys** – Decoy trains are modeled similarly to real cars but are exempt from the completion order, allowing them to circulate or park without interfering with the main objective.
+**Decoys** – Decoy cars follow the track like trains but never need to arrive. A decoy whose track runs out, leaves the board, or whose next cell is taken by another car crashes and stays where it is for the rest of the run (it waits, rather than crashing, at closed gates and semaphores). Decoys may never reach the target, and nothing they do after the last train has arrived matters.
 
-**Semaphores** – Player-placeable gates that sit on straights or corners adjacent to switches. They start closed, blocking traffic from either side, and automatically flip open forever one timestep after any train (or decoy) enters a connected switch that feeds the guarded track.
+**Semaphores** – Placed on straights or corners (some levels also pre-place them). A semaphore starts closed, so a car about to enter it waits in front of it. It opens for good once, while a car is waiting at it, another car stands on the cell at its other end without heading into it.
 
 **Dual targets** – Some levels require trains to reach two distinct destination locations. Feasibility requires satisfying both targets; the model enforces completion only when all assigned trains have visited both goal tiles in the required order (if any).
 
@@ -59,6 +59,7 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 - `data/` – MiniZinc `.dzn` instances for each campaign puzzle currently modeled.
 - `convert_levels.py` – Converts the legacy `levels.json` dump into `.dzn` files.
 - `scripts/solve.py` – Runs both search orders in parallel and prints the first solution.
+- `scripts/crosscheck_cpp.py` – Checks that every board found by the RailboundSolver C++ simulator is accepted by this model.
 - `images/` – Static artwork shipped with the project (used in documentation).
 - `docs/` – Reference assets such as the cover image and gameplay animation embedded above.
 - `viz.html` – Lightweight viewer that turns solver output into an interactive grid.
@@ -68,7 +69,7 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 
 Board cells are addressed by a single row-major index `cell(r, c) = (r - 1) * W + c`, so each vehicle has one position variable per timestep. Collision, swap, station, and activation checks are single integer comparisons, and moving to the next cell (including tunnel teleports) is one lookup in the precomputed `move_cell` / `move_entry` tables. Switch toggles and gate/semaphore blocking are computed once per cell and timestep and shared by every train and decoy.
 
-`main.mzn` offers two search orders: `SEARCH=1` (train-major: earliest arrivals, then each train's route in turn) and `SEARCH=2` (time-major: all trains advance together one step at a time, nearest-to-target cell first). Neither wins everywhere, so `scripts/solve.py` races both. On the 181 bundled levels (Chuffed, 60 s limit) the portfolio solves 173 levels, versus 155 for the original model with the solver's default order.
+`main.mzn` offers two search orders: `SEARCH=1` (train-major: earliest arrivals, then each train's route in turn) and `SEARCH=2` (time-major: all trains advance together one step at a time, nearest-to-target cell first). Neither wins everywhere, so `scripts/solve.py` races both. On the 181 bundled levels (Chuffed, 60 s limit) the portfolio solves 173.
 
 ## Installation
 
@@ -108,6 +109,8 @@ If you're crafting your own `.dzn` instances, see the data schema in [docs/data_
 Solver performance depends on the level size: levels 1–7 typically solve in under a second, while level 8 requires broader search and may take up to a minute on laptop hardware.
 
 ## Contributing
+
+The mechanics follow the reference simulator of [FoxtrotOnce/RailboundSolver](https://github.com/FoxtrotOnce/RailboundSolver): every board its C++ solver finds for the bundled levels is accepted by this model. `scripts/crosscheck_cpp.py` re-runs that check (it needs a built copy of that solver). Level data is generated from its `levels.json` with `python convert_levels.py -f --keep-max-time -j path/to/levels.json`, which keeps the hand-tuned `MAX_TIME` horizons.
 
 Open an issue or discussion thread if you spot a mechanic that is not yet captured. Pull requests that improve the MiniZinc model, add tests, or document the remaining four levels are welcome.
 

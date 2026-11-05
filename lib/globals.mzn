@@ -62,14 +62,21 @@ array[CELLS] of Dir: tunnel_exit_dir = [
 | p in CELLS ];
 
 % move_cell[p, e] / move_entry[p, e]: where a vehicle on p ends up when the
-% track routes it out through side e.  Tunnels ignore e and teleport to the
-% far side of their paired tunnel, so tunnels and normal track share one
-% lookup and the movement constraints need no tunnel case split.
+% track routes it out through side e, and the side it is then considered to
+% have entered from.  As in the game, driving into a tunnel mouth puts the
+% vehicle straight onto the paired tunnel tile, facing out of that tunnel's
+% mouth; the next step leaves it from there.  A tunnel that does not accept
+% entry from that side is a dead end (0), like leaving the board.
 array[CELLS, Dir] of CELLS0: move_cell = array2d(CELLS, Dir, [
-  if is_tunnel_cell[p] then nbr[tunnel_dest[p], tunnel_exit_dir[p]] else nbr[p, e] endif
+  let { int: q = nbr[p, e]; } in
+  if q = 0 then 0
+  elseif is_tunnel_cell[q] then
+    (if can_enter[fixed_piece[q], opposite[e]] then tunnel_dest[q] else 0 endif)
+  else q endif
 | p in CELLS, e in Dir ]);
 array[CELLS, Dir] of Dir: move_entry = array2d(CELLS, Dir, [
-  if is_tunnel_cell[p] then opposite[tunnel_exit_dir[p]] else opposite[e] endif
+  let { int: q = nbr[p, e]; } in
+  if q > 0 /\ is_tunnel_cell[q] then tunnel_exit_dir[q] else opposite[e] endif
 | p in CELLS, e in Dir ]);
 
 % ==== GATE / SWITCH / ACTIVATION METADATA ====
@@ -285,7 +292,7 @@ function array[CELLS] of int: relax_dist(array[CELLS] of int: d, array[CELLS] of
 
 % Distance from a vehicle start (row, col, heading): its first move is forced.
 function array[CELLS] of int: dist_from_start(int: r, int: c, Dir: d0) =
-  let { int: p0 = cell(r, c); int: p1 = nbr[p0, d0]; } in
+  let { int: p0 = cell(r, c); int: p1 = move_cell[p0, d0]; } in
   relax_dist([ if p = p0 then 0 elseif p = p1 then 1 else UNREACHABLE endif | p in CELLS ], preds);
 
 array[1..N_TRAINS, CELLS] of int: train_dist_from_start = array2d(1..N_TRAINS, CELLS,

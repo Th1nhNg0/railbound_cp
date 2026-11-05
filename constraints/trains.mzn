@@ -12,14 +12,31 @@ constraint forall(t in 1..N_TRAINS) (
   let {
     int: p0 = cell(TRAINS[t].1, TRAINS[t].2);
     Dir: dir0 = TRAINS[t].3;
-    int: ip = nbr[p0, dir0];
-    Dir: ied = opposite[dir0];
+    int: ip = move_cell[p0, dir0];
+    Dir: ied = move_entry[p0, dir0];
   } in
   train_pos[t, 0] = p0 /\
   ip > 0 /\ % The first move must stay on the board.
   can_enter[grid_ext[ip], ied] /\
   train_pos[t, 1] = if blocked[ip, 1] then p0 else ip endif /\
   train_dir[t, 1] = ied
+);
+
+% ==== TRAIN HEADING ====
+% train_heading[t, i]: side the train will leave its cell by.  As in the game
+% it is fixed when the train enters the cell, so a train waiting on a switch
+% keeps its exit even if the switch toggles under it.  Without toggling
+% switches routing never changes and the heading is read off the track.
+array[1..N_TRAINS, 1..MAX_TIME] of var Dir: train_heading;
+constraint forall(t in 1..N_TRAINS, i in 1..MAX_TIME)(
+  let { var Dir: on_entry = exit_of[effective_piece[train_pos[t, i], i], train_dir[t, i]]; } in
+  if not SWITCHES_TOGGLE then
+    train_heading[t, i] = on_entry
+  elseif i = 1 then
+    train_heading[t, 1] = if train_pos[t, 1] != train_pos[t, 0] then on_entry else TRAINS[t].3 endif
+  else
+    train_heading[t, i] = if train_pos[t, i] != train_pos[t, i-1] then on_entry else train_heading[t, i-1] endif
+  endif
 );
 
 % ==== TRAIN MOVEMENT ====
@@ -31,7 +48,7 @@ constraint forall(t in 1..N_TRAINS, time in 1..MAX_TIME-1 where time < arrival_t
   let {
     var CELLS: p = train_pos[t, time];
     var Dir: entry_dir = train_dir[t, time];
-    var Dir: exit_dir = exit_of[effective_piece[p, time], entry_dir];
+    var Dir: exit_dir = train_heading[t, time];
     var CELLS0: ip = move_cell[p, exit_dir]; % 0 = off-board, rejected by can_enter.
     var Dir: ied = move_entry[p, exit_dir];
     var bool: waiting = if N_STATIONS = 0 then false else station_wait_time[t, time] > 0 endif;

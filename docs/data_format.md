@@ -23,6 +23,7 @@ Railbound instances in `data/` are plain-text MiniZinc `.dzn` files. Each file d
 - `MAX_TIME` - discrete time horizon. Must be long enough for every train to reach the target.
 - `MAX_TRACKS` - maximum number of non-empty, non-initial cells the solver may fill with new pieces.
 - `SEMAPHORE_SUPPLY` - how many semaphore overlays the player may place. Use `0` if the level does not provide any.
+- `FIXED_SEMAPHORES = [(row, col), ...]` - semaphores already placed by the level; they do not count against `SEMAPHORE_SUPPLY`. Use `[]` when there are none.
 - `TARGET = (row, col)` - destination cell shared by all trains. The model expects the exit to be on the right edge so trains finish facing `LEFT`.
 
 ## Vehicle Seeds
@@ -55,12 +56,11 @@ Railbound instances in `data/` are plain-text MiniZinc `.dzn` files. Each file d
 
 ## Semaphores
 
-Levels that allow the player to place semaphores must set `SEMAPHORE_SUPPLY > 0`. The solver treats semaphores as overlays on straights or corners that touch at least one switch (deterministic, dynamic, or exit-triggered). A placed semaphore behaves like a normally-closed gate:
+Levels that let the player place semaphores set `SEMAPHORE_SUPPLY > 0`; semaphores the level places itself go in `FIXED_SEMAPHORES`. A semaphore sits on a straight or corner tile that carries no other feature (gate, activation tile, station, tunnel, car start or target) and behaves like a normally-closed gate:
 
-- Trains and decoys stop on the preceding cell while the semaphore is closed.
-- When any train or decoy enters one of the adjacent switches, the semaphore opens on the following timestep and stays open for the remainder of the run. If no train ever enters a linked switch, the semaphore remains closed throughout the solution.
-- Semaphores cannot be placed on tiles that already host a gate or an activation pad; those pieces keep their original overlays.
-- The solver decides which eligible cells receive semaphores, up to the provided `SEMAPHORE_SUPPLY` amount; omit the parameter or set it to `0` when the feature is absent.
+- A car about to enter a closed semaphore waits on the preceding cell.
+- The semaphore opens for good at the first step where, while some car faces it, another car stands on one of the two cells its track connects and is not itself heading into the semaphore. The waiting car moves on in the following step.
+- The solver decides which eligible cells receive the `SEMAPHORE_SUPPLY` semaphores.
 
 ## Stations
 
@@ -80,6 +80,8 @@ W=5;
 H=3;
 MAX_TIME=20;
 MAX_TRACKS=12;
+SEMAPHORE_SUPPLY=0;
+FIXED_SEMAPHORES=[];
 TARGET=(2,5);
 
 TRAINS=[(2,1,RIGHT)];
