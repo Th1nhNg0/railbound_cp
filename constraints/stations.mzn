@@ -3,198 +3,58 @@
 % ============================================================
 % Defines station mechanics: trains must visit assigned stations,
 % incur a 2-step dwell time on first arrival, and visit all stations
-% before reaching the target.
+% before reaching the target.  STATIONS[st].3 > 0 names a train,
+% < 0 names decoy -STATIONS[st].3.
 % ============================================================
 
-% ==== STATION ASSIGNMENT MAPPING ====
-% Pre-compute which stations each train must visit.
-int: MAX_STATIONS_PER_VEHICLE = N_STATIONS; % Max stations per train.
-
-% Train station indices for each train (pre-computed from STATIONS data).
-array[1..N_TRAINS, 1..MAX_STATIONS_PER_VEHICLE] of int: train_station_indices = array2d(1..N_TRAINS, 1..MAX_STATIONS_PER_VEHICLE, [
-  if N_STATIONS = 0 then 0
-  else
-    let { 
-      array[int] of int: matching_stations = [st | st in 1..N_STATIONS where STATIONS[st].3 = t];
-      int: num_matches = length(matching_stations);
-    } in
-    if s <= num_matches then matching_stations[s] else 0 endif
-  endif
-| t in 1..N_TRAINS, s in 1..MAX_STATIONS_PER_VEHICLE]);
-
-% Count of stations assigned to each train.
-array[1..N_TRAINS] of int: train_station_count = [
-  if N_STATIONS = 0 then 0
-  else length([st | st in 1..N_STATIONS where STATIONS[st].3 = t])
-  endif
-| t in 1..N_TRAINS];
-
-% Decoy station indices for each decoy.
-array[1..N_DECOYS, 1..MAX_STATIONS_PER_VEHICLE] of int: decoy_station_indices = array2d(1..N_DECOYS, 1..MAX_STATIONS_PER_VEHICLE, [
-  if N_STATIONS = 0 then 0
-  else
-    let { 
-      array[int] of int: matching_stations = [st | st in 1..N_STATIONS where STATIONS[st].3 = -d];
-      int: num_matches = length(matching_stations);
-    } in
-    if s <= num_matches then matching_stations[s] else 0 endif
-  endif
-| d in 1..N_DECOYS, s in 1..MAX_STATIONS_PER_VEHICLE]);
-
-% Count of stations assigned to each decoy.
-array[1..N_DECOYS] of int: decoy_station_count = [
-  if N_STATIONS = 0 then 0
-  else length([st | st in 1..N_STATIONS where STATIONS[st].3 = -d])
-  endif
-| d in 1..N_DECOYS];
+array[1..N_STATIONS] of CELLS: station_cell = [ cell(STATIONS[st].1, STATIONS[st].2) | st in 1..N_STATIONS ];
 
 % ==== STATION VISITATION TRACKING ====
-% Track if each station has been visited by its assigned vehicle by each timestep.
-constraint if N_STATIONS > 0 then
-  forall(st in 1..N_STATIONS)(
-    let {
-      int: vehicle_id = STATIONS[st].3;
-      1..H: station_r = STATIONS[st].1;
-      1..W: station_c = STATIONS[st].2;
-    } in
-    forall(time in 0..MAX_TIME)(
+% station_visited_by_time[st, t]: the assigned vehicle has been on st by time t.
+constraint forall(st in 1..N_STATIONS, time in 0..MAX_TIME)(
+  let {
+    int: v = STATIONS[st].3;
+    var bool: here = if v > 0 then train_pos[v, time] = station_cell[st]
+                     else decoy_pos[-v, time] = station_cell[st] endif;
+  } in
+  station_visited_by_time[st, time] =
+    if time = 0 then here else (here \/ station_visited_by_time[st, time - 1]) endif
+);
+
+% ==== STATION WAIT TIME ====
+% A vehicle waits 2 steps on the first arrival at any of its stations.
+predicate station_dwell(array[int] of var 0..2: wait, array[int] of var CELLS: pos, int: vehicle_id) =
+  let { array[int] of int: mine = [ st | st in 1..N_STATIONS where STATIONS[st].3 = vehicle_id ]; } in
+  forall(time in STATION_TIMES)(
+    if length(mine) = 0 then
+      wait[time] = 0
+    else
       let {
-        var bool: vehicle_at_station_now = % Vehicle currently at this station.
-            if vehicle_id > 0 then
-                train_row[vehicle_id, time] = station_r /\ train_col[vehicle_id, time] = station_c
-            else
-                decoy_row[-vehicle_id, time] = station_r /\ decoy_col[-vehicle_id, time] = station_c
-            endif;
-        var bool: was_visited_before = if time = 0 then false else station_visited_by_time[st, time-1] endif; % Visited before now.
+        var bool: at_any = exists(st in mine)(pos[time] = station_cell[st]);
+        var bool: first_visit = if time = 0 then at_any else
+          exists(st in mine)(pos[time] = station_cell[st] /\ not station_visited_by_time[st, time - 1]) endif;
       } in
-      station_visited_by_time[st, time] = (vehicle_at_station_now \/ was_visited_before) % Visited now or before.
-    )
-  )
-endif;
-
-% ==== STATION WAIT TIME CONSTRAINT ====
-% Trains wait 2 steps on first arrival at any assigned station.
-constraint forall(t in 1..N_TRAINS, time in STATION_TIMES) (
-  let {
-    int: num_stations = train_station_count[t];
-    var bool: at_any_station = if num_stations = 0 then false % No stations assigned.
-      else exists(s in 1..num_stations where train_station_indices[t, s] > 0)(
-        let {
-          1..N_STATIONS: st_idx = train_station_indices[t, s];
-          1..H: station_r = STATIONS[st_idx].1;
-          1..W: station_c = STATIONS[st_idx].2;
-        } in
-        train_row[t, time] = station_r /\ train_col[t, time] = station_c % At any assigned station.
-      ) endif;
-    var bool: is_first_visit_any = if num_stations = 0 then false % No stations assigned.
-      else exists(s in 1..num_stations where train_station_indices[t, s] > 0)(
-        let {
-          1..N_STATIONS: st_idx = train_station_indices[t, s];
-          1..H: station_r = STATIONS[st_idx].1;
-          1..W: station_c = STATIONS[st_idx].2;
-          var bool: at_this_station = (train_row[t, time] = station_r /\ train_col[t, time] = station_c); % At station now.
-          var bool: was_visited_before = if time = 0 then false else station_visited_by_time[st_idx, time-1] endif; % Visited before.
-        } in
-        at_this_station /\ not was_visited_before % First visit to any assigned station.
-      ) endif;
-  } in
-  if num_stations = 0 then
-    station_wait_time[t, time] = 0 % No waiting if no stations.
-  else
-    if time = 0 then
-      if at_any_station then
-        station_wait_time[t, time] = 2 % Start with 2-step wait if at station.
-      else
-        station_wait_time[t, time] = 0 % No wait if not at station.
-      endif
-    else
-      if is_first_visit_any then
-        station_wait_time[t, time] = 2 % Start 2-step wait on first visit.
-      elseif at_any_station /\ station_wait_time[t, time-1] > 0 then
-        station_wait_time[t, time] = max(0, station_wait_time[t, time-1] - 1) % Decrement wait.
-      else
-        station_wait_time[t, time] = 0 % No waiting.
-      endif
+      wait[time] =
+        if first_visit then 2
+        elseif time > 0 then (if at_any /\ wait[time - 1] > 0 then wait[time - 1] - 1 else 0 endif)
+        else 0 endif
     endif
-  endif
-);
+  );
 
-% Decoys wait 2 steps on first arrival at any assigned station.
-constraint forall(d in 1..N_DECOYS, time in STATION_TIMES) (
-  let {
-    int: num_stations = decoy_station_count[d];
-    var bool: at_any_station = if num_stations = 0 then false % No stations assigned.
-      else exists(s in 1..num_stations where decoy_station_indices[d, s] > 0)(
-        let {
-          1..N_STATIONS: st_idx = decoy_station_indices[d, s];
-          1..H: station_r = STATIONS[st_idx].1;
-          1..W: station_c = STATIONS[st_idx].2;
-        } in
-        decoy_row[d, time] = station_r /\ decoy_col[d, time] = station_c % At any assigned station.
-      ) endif;
-    var bool: is_first_visit_any = if num_stations = 0 then false % No stations assigned.
-      else exists(s in 1..num_stations where decoy_station_indices[d, s] > 0)(
-        let {
-          1..N_STATIONS: st_idx = decoy_station_indices[d, s];
-          1..H: station_r = STATIONS[st_idx].1;
-          1..W: station_c = STATIONS[st_idx].2;
-          var bool: at_this_station = (decoy_row[d, time] = station_r /\ decoy_col[d, time] = station_c); % At station now.
-          var bool: was_visited_before = if time = 0 then false else station_visited_by_time[st_idx, time-1] endif; % Visited before.
-        } in
-        at_this_station /\ not was_visited_before % First visit to any assigned station.
-      ) endif;
-  } in
-  if num_stations = 0 then
-    decoy_station_wait_time[d, time] = 0 % No waiting if no stations.
-  else
-    if time = 0 then
-      if at_any_station then
-        decoy_station_wait_time[d, time] = 2 % Start with 2-step wait if at station.
-      else
-        decoy_station_wait_time[d, time] = 0 % No wait if not at station.
-      endif
-    else
-      if is_first_visit_any then
-        decoy_station_wait_time[d, time] = 2 % Start 2-step wait on first visit.
-      elseif at_any_station /\ decoy_station_wait_time[d, time-1] > 0 then
-        decoy_station_wait_time[d, time] = max(0, decoy_station_wait_time[d, time-1] - 1) % Decrement wait.
-      else
-        decoy_station_wait_time[d, time] = 0 % No waiting.
-      endif
-    endif
-  endif
+constraint forall(t in 1..N_TRAINS)(
+  station_dwell(array1d(STATION_TIMES, [station_wait_time[t, i] | i in STATION_TIMES]),
+                array1d(STATION_TIMES, [train_pos[t, i] | i in STATION_TIMES]), t)
 );
-
-% ==== STATION ARRIVAL PRECEDENCE ====
-% All assigned stations must be visited before reaching target.
-constraint forall(t in 1..N_TRAINS where train_station_count[t] > 0) (
-  forall(s in 1..train_station_count[t] where train_station_indices[t, s] > 0)(
-    let {
-      1..N_STATIONS: st_idx = train_station_indices[t, s];
-      1..H: station_r = STATIONS[st_idx].1;
-      1..W: station_c = STATIONS[st_idx].2;
-    } in
-    exists(time in 0..MAX_TIME)(
-      time < arrival_time[t] /\ % Before arrival at target.
-      train_row[t, time] = station_r /\ train_col[t, time] = station_c % At this station.
-    )
-  )
+constraint forall(d in 1..N_DECOYS)(
+  station_dwell(array1d(STATION_TIMES, [decoy_station_wait_time[d, i] | i in STATION_TIMES]),
+                array1d(STATION_TIMES, [decoy_pos[d, i] | i in STATION_TIMES]), -d)
 );
 
 % ==== ALL STATIONS MUST BE VISITED ====
-% Ensure every station is visited by its assigned vehicle.
+% Trains must visit their stations before reaching the target; decoys at
+% some point within the horizon.  Visits are monotone, so one lookup suffices.
 constraint forall(st in 1..N_STATIONS)(
-  let {
-    int: vehicle_id = STATIONS[st].3;
-  } in
-  if vehicle_id > 0 then
-    exists(time in 0..MAX_TIME)(
-      time < arrival_time[vehicle_id] /\ % Before arrival at target.
-      station_visited_by_time[st, time] % At this station.
-    )
-  else
-    exists(time in 0..MAX_TIME)(
-      station_visited_by_time[st, time] % Decoy visited it by MAX_TIME.
-    )
-  endif
+  let { int: v = STATIONS[st].3; } in
+  if v > 0 then station_visited_by_time[st, arrival_time[v] - 1]
+  else station_visited_by_time[st, MAX_TIME] endif
 );

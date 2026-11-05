@@ -39,42 +39,67 @@ include "lib/globals.mzn";
 
 % Grid: Tracks and pieces to place on the puzzle board.
 array[1..H, 1..W] of var Piece: grid; % Grid cells contain track pieces (straights, corners, switches, etc.).
+% Row-major view of the grid (index = cell(r, c)), plus the off-board sink 0.
+array[CELLS] of var Piece: grid_flat = array1d(grid);
+array[CELLS0] of var Piece: grid_ext = array1d(CELLS0, [EMPTY] ++ grid_flat);
 
-% Train Movement: Position and direction of each train at each timestep.
-array[1..N_TRAINS, 0..MAX_TIME] of var 1..H: train_row;     % Train row position over time.
-array[1..N_TRAINS, 0..MAX_TIME] of var 1..W: train_col;     % Train column position over time.
+% Train Movement: Cell and entry direction of each train at each timestep.
+array[1..N_TRAINS, 0..MAX_TIME] of var CELLS: train_pos;    % Train cell index over time.
 array[1..N_TRAINS, 1..MAX_TIME] of var Dir: train_dir;      % Direction train enters each cell.
 % Arrival bounds must remain independent of geometric distance: a tunnel can
 % move a train farther than its Manhattan distance permits in one timestep.
 array[1..N_TRAINS] of var 1..MAX_TIME: arrival_time;
 
-% Decoy Movement: Position and direction of each decoy train (obstacle to avoid).
-array[1..N_DECOYS, 0..MAX_TIME] of var 1..H: decoy_row;
-array[1..N_DECOYS, 0..MAX_TIME] of var 1..W: decoy_col;
+% Decoy Movement: Cell and entry direction of each decoy (obstacle to avoid).
+array[1..N_DECOYS, 0..MAX_TIME] of var CELLS: decoy_pos;
 array[1..N_DECOYS, 1..MAX_TIME] of var Dir: decoy_dir;
 
 % Gate/Switch State: Toggle states for gates, dynamic switches, and exit-triggered switches.
-set of int: GATE_INDICES = if N_GATES = 0 then {} else 1..N_GATES endif;
-set of int: DSWITCH_INDICES = if N_DSWITCHES = 0 then {} else 1..N_DSWITCHES endif;
-set of int: ESWITCH_INDICES = if N_ESWITCHES = 0 then {} else 1..N_ESWITCHES endif;
+set of int: GATE_INDICES = 1..N_GATES;
+set of int: DSWITCH_INDICES = 1..N_DSWITCHES;
+set of int: ESWITCH_INDICES = 1..N_ESWITCHES;
 array[GATE_INDICES, 0..MAX_TIME] of var bool: gate_open;
 array[DSWITCH_INDICES, 0..MAX_TIME] of var bool: dswitch_toggled;
 array[ESWITCH_INDICES, 0..MAX_TIME] of var bool: eswitch_toggled;
 
-% Station state is declared centrally so feature-specialized models can omit
-% station constraints entirely when the station index set is empty.
+% Station state (index sets are empty when the level has no stations).
 set of int: STATION_TIMES = if N_STATIONS = 0 then {} else 0..MAX_TIME endif;
 array[1..N_TRAINS, STATION_TIMES] of var 0..2: station_wait_time;
 array[1..N_DECOYS, STATION_TIMES] of var 0..2: decoy_station_wait_time;
 array[1..N_STATIONS, 0..MAX_TIME] of var bool: station_visited_by_time;
 
-
-% Semaphore Placement: Direct presence indicator and opening time per cell.
-% These arrays remain grid-shaped even when no semaphores are supplied.  Decoy
-% movement refers to them unconditionally, and empty index sets turn those
-% otherwise-inactive references into undefined expressions (and hence UNSAT).
+% Semaphore Placement: presence indicator and opening time per cell
+% (opening time 0 = no semaphore; MAX_TIME + 1 = never opens).
 array[1..H, 1..W] of var bool: semaphore_present;
 array[1..H, 1..W] of var 0..(MAX_TIME + 1): semaphore_open_time;
+
+% ==== DERIVED PER-CELL STATE (shared by trains and decoys) ====
+
+% Cells that may host a semaphore (gate and activation tiles keep their overlay).
+array[CELLS] of bool: semaphore_candidate = [
+  SEMAPHORE_SUPPLY > 0 /\ gate_at[p] = 0 /\ not is_activation_cell[p] | p in CELLS ];
+
+% effective_piece[p, t]: routing of cell p at time t, i.e. the placed piece
+% with any dynamic / exit-triggered switch toggle applied.  Switch cells are
+% pre-placed, so their two possible routings are parameters.
+array[CELLS, 0..MAX_TIME] of var Piece: effective_piece = array2d(CELLS, 0..MAX_TIME, [
+  if dswitch_at[p] > 0 then
+    (if dswitch_toggled[dswitch_at[p], t] then switch_toggle[init_piece[p]] else init_piece[p] endif)
+  elseif eswitch_at[p] > 0 then
+    (if eswitch_toggled[eswitch_at[p], t] then switch_toggle[init_piece[p]] else init_piece[p] endif)
+  else grid_flat[p] endif
+| p in CELLS, t in 0..MAX_TIME ]);
+
+% blocked[p, t]: entering cell p on the move that lands at time t is refused
+% by a closed gate or a semaphore that has not opened yet.  Cell 0 (off-board)
+% is never "blocked"; it is rejected by can_enter instead.
+array[CELLS0, 1..MAX_TIME] of var bool: blocked = array2d(CELLS0, 1..MAX_TIME, [
+  if p = 0 then false
+  else
+    (if gate_at[p] > 0 then not gate_open[gate_at[p], t] else false endif) \/
+    (if semaphore_candidate[p] then t < semaphore_open_time[cell_row[p], cell_col[p]] else false endif)
+  endif
+| p in CELLS0, t in 1..MAX_TIME ]);
 
 % ============================================================
 % CONSTRAINTS

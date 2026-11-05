@@ -1,103 +1,102 @@
 % ============================================================
 % lib/globals.mzn - Global Lookup Tables & Helper Structures
 % ============================================================
-% Pre-computes lookup tables essential for efficient constraint formulation.
-% Includes directional offsets, tunnel mappings, gate/switch metadata,
-% and routing permission matrices. Requires lib/types.mzn to be included first.
+% Pre-computes the parameter tables the constraints index into.
+%
+% Board cells are addressed by a single row-major index
+%   cell(r, c) = (r - 1) * W + c        (1..N_CELLS)
+% which matches array1d(grid).  Vehicles are tracked by cell index, so every
+% "same position" test is one integer comparison instead of a row/column pair,
+% and every neighbour/tunnel lookup is a single 1-D table read.
+% Requires lib/types.mzn and the data parameters to be declared first.
 % ============================================================
 
 % ==== DIRECTIONAL HELPERS ====
-% Offset arrays for translating directions to grid movements.
 array[Dir] of int: dr = [ -1,  0,  1,  0 ]; % Row offsets [TOP, RIGHT, DOWN, LEFT].
 array[Dir] of int: dc = [  0,  1,  0, -1 ]; % Column offsets [TOP, RIGHT, DOWN, LEFT].
 array[Dir] of Dir: opposite = [ DOWN, LEFT, TOP, RIGHT ]; % Opposite direction for each entry.
 
+% ==== CELL INDEXING ====
+int: N_CELLS = H * W;
+set of int: CELLS = 1..N_CELLS;
+% Cell 0 is a virtual off-board sink: it always reads as EMPTY (impassable).
+set of int: CELLS0 = 0..N_CELLS;
+
+function int: cell(int: r, int: c) = (r - 1) * W + c;
+function bool: on_board(int: r, int: c) = r >= 1 /\ r <= H /\ c >= 1 /\ c <= W;
+
+array[CELLS] of 1..H: cell_row = [ (p - 1) div W + 1 | p in CELLS ];
+array[CELLS] of 1..W: cell_col = [ (p - 1) mod W + 1 | p in CELLS ];
+
+% nbr[p, d]: cell reached by leaving p towards d (0 when that leaves the board).
+array[CELLS, Dir] of CELLS0: nbr = array2d(CELLS, Dir, [
+  let { int: r = cell_row[p] + dr[d]; int: c = cell_col[p] + dc[d]; } in
+  if on_board(r, c) then cell(r, c) else 0 endif
+| p in CELLS, d in Dir ]);
+
+int: TARGET_CELL = cell(TARGET.1, TARGET.2);
+
 % ==== TUNNEL LOOKUP TABLES ====
-% Maps tunnel cells to their destination coordinates and exit direction.
-array[1..H, 1..W] of 1..H: tunnel_dest_row =
-  array2d(1..H, 1..W, [
-    if N_TUNNELS = 0 then r
-    else
-      let {
-        int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
-        int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
-      } in
-      if idx_A > 0 then TUNNEL_PAIRS[idx_A].4
-      elseif idx_B > 0 then TUNNEL_PAIRS[idx_B].1
-      else r % non-tunnel cells map to themselves
-      endif
-    endif
-  | r in 1..H, c in 1..W
-  ]);
+% tunnel_pair_of[p]: index of the tunnel pair p belongs to (0 if none).
+array[CELLS] of 0..N_TUNNELS: tunnel_pair_of = [
+  sum(i in 1..N_TUNNELS where
+      cell(TUNNEL_PAIRS[i].1, TUNNEL_PAIRS[i].2) = p \/
+      cell(TUNNEL_PAIRS[i].4, TUNNEL_PAIRS[i].5) = p)(i)
+| p in CELLS ];
+array[CELLS] of bool: is_tunnel_cell = [ tunnel_pair_of[p] > 0 | p in CELLS ];
 
-% Maps each cell to its tunnel destination column.
-array[1..H, 1..W] of 1..W: tunnel_dest_col =
-  array2d(1..H, 1..W, [
-    if N_TUNNELS = 0 then c
-    else
-      let {
-        int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
-        int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
-      } in
-      if idx_A > 0 then TUNNEL_PAIRS[idx_A].5
-      elseif idx_B > 0 then TUNNEL_PAIRS[idx_B].2
-      else c % non-tunnel cells map to themselves
-      endif
-    endif
-  | r in 1..H, c in 1..W
-  ]);
+% tunnel_dest[p]: the paired tunnel cell (p itself for non-tunnel cells).
+array[CELLS] of CELLS: tunnel_dest = [
+  let { int: i = tunnel_pair_of[p]; } in
+  if i = 0 then p
+  elseif cell(TUNNEL_PAIRS[i].1, TUNNEL_PAIRS[i].2) = p then cell(TUNNEL_PAIRS[i].4, TUNNEL_PAIRS[i].5)
+  else cell(TUNNEL_PAIRS[i].1, TUNNEL_PAIRS[i].2) endif
+| p in CELLS ];
 
-% Maps each cell to its tunnel exit direction (as an integer).
-% Defaults to 1 (TOP) for non-tunnels.
-array[1..H, 1..W] of int: tunnel_exit_dir =
-  array2d(1..H, 1..W, [
-    if N_TUNNELS = 0 then 1
-    else
-      let {
-        int: idx_A = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c)(i);
-        int: idx_B = sum(i in 1..N_TUNNELS where TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c)(i);
-      } in
-      if idx_A > 0 then enum2int(TUNNEL_PAIRS[idx_A].6)
-      elseif idx_B > 0 then enum2int(TUNNEL_PAIRS[idx_B].3)
-      else 1
-      endif
-    endif
-  | r in 1..H, c in 1..W
-  ]);
+% tunnel_exit_dir[p]: direction a train leaves the paired tunnel end.
+array[CELLS] of Dir: tunnel_exit_dir = [
+  let { int: i = tunnel_pair_of[p]; } in
+  if i = 0 then TOP
+  elseif cell(TUNNEL_PAIRS[i].1, TUNNEL_PAIRS[i].2) = p then TUNNEL_PAIRS[i].6
+  else TUNNEL_PAIRS[i].3 endif
+| p in CELLS ];
 
-% ==== GATE METADATA ====
-% Maps cells to gates and tracks gate placement.
-int: GATE_INDEX_UPPER = if N_GATES = 0 then 1 else N_GATES endif; % Bounds gate index lookup.
-array[1..H, 1..W] of 1..GATE_INDEX_UPPER: gate_index_at =
-  array2d(1..H, 1..W, [ let { int: g_idx = if N_GATES = 0 then 0 else sum(g in 1..N_GATES where GATES[g].1 = r /\ GATES[g].2 = c)(g) endif; } in if g_idx > 0 then g_idx else 1 endif | r in 1..H, c in 1..W ]);
-array[1..H, 1..W] of bool: cell_has_gate =
-  array2d(1..H, 1..W, [ let { int: count = if N_GATES = 0 then 0 else sum(g in 1..N_GATES where GATES[g].1 = r /\ GATES[g].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
+% move_cell[p, e] / move_entry[p, e]: where a vehicle on p ends up when the
+% track routes it out through side e.  Tunnels ignore e and teleport to the
+% far side of their paired tunnel, so tunnels and normal track share one
+% lookup and the movement constraints need no tunnel case split.
+array[CELLS, Dir] of CELLS0: move_cell = array2d(CELLS, Dir, [
+  if is_tunnel_cell[p] then nbr[tunnel_dest[p], tunnel_exit_dir[p]] else nbr[p, e] endif
+| p in CELLS, e in Dir ]);
+array[CELLS, Dir] of Dir: move_entry = array2d(CELLS, Dir, [
+  if is_tunnel_cell[p] then opposite[tunnel_exit_dir[p]] else opposite[e] endif
+| p in CELLS, e in Dir ]);
 
-% ==== DYNAMIC SWITCH METADATA ====
-% Maps cells to dynamic switches and tracks their placement.
-int: DSWITCH_INDEX_UPPER = if N_DSWITCHES = 0 then 1 else N_DSWITCHES endif; % Bounds dswitch index lookup.
-array[1..H, 1..W] of 1..DSWITCH_INDEX_UPPER: dswitch_index_at =
-  array2d(1..H, 1..W, [ let { int: ds_idx = if N_DSWITCHES = 0 then 0 else sum(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c)(ds) endif; } in if ds_idx > 0 then ds_idx else 1 endif | r in 1..H, c in 1..W ]);
-array[1..H, 1..W] of bool: cell_has_dswitch =
-  array2d(1..H, 1..W, [ let { int: count = if N_DSWITCHES = 0 then 0 else sum(ds in 1..N_DSWITCHES where DSWITCHES[ds].1 = r /\ DSWITCHES[ds].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
+% ==== GATE / SWITCH / ACTIVATION METADATA ====
+array[CELLS] of 0..N_GATES: gate_at = [
+  sum(g in 1..N_GATES where cell(GATES[g].1, GATES[g].2) = p)(g) | p in CELLS ];
+array[CELLS] of 0..N_DSWITCHES: dswitch_at = [
+  sum(ds in 1..N_DSWITCHES where cell(DSWITCHES[ds].1, DSWITCHES[ds].2) = p)(ds) | p in CELLS ];
+array[CELLS] of bool: is_activation_cell = [
+  exists(a in 1..N_ACTIVATIONS)(cell(ACTIVATIONS[a].1, ACTIVATIONS[a].2) = p) | p in CELLS ];
 
-% ==== EXIT-TRIGGERED SWITCH METADATA ====
-% Maps cells to exit-triggered switches and tracks their placement.
-array[1..N_ESWITCHES] of tuple(int, int): ESWITCHES_DERIVED =
-  [(INIT_POS[i].1, INIT_POS[i].2) | i in 1..N_INIT_POS where INIT_POS[i].3 in ESWITCHES_SET]; % Coordinates of all ESWITCHes.
-int: ESWITCH_INDEX_UPPER = if N_ESWITCHES = 0 then 1 else N_ESWITCHES endif; % Bounds eswitch index lookup.
-array[1..H, 1..W] of 1..ESWITCH_INDEX_UPPER: eswitch_index_at =
-  array2d(1..H, 1..W, [ let { int: es_idx = if N_ESWITCHES = 0 then 0 else sum(es in 1..N_ESWITCHES where ESWITCHES_DERIVED[es].1 = r /\ ESWITCHES_DERIVED[es].2 = c)(es) endif; } in if es_idx > 0 then es_idx else 1 endif | r in 1..H, c in 1..W ]);
-array[1..H, 1..W] of bool: cell_has_eswitch =
-  array2d(1..H, 1..W, [ let { int: count = if N_ESWITCHES = 0 then 0 else sum(es in 1..N_ESWITCHES where ESWITCHES_DERIVED[es].1 = r /\ ESWITCHES_DERIVED[es].2 = c)(1) endif; } in count > 0 | r in 1..H, c in 1..W ]);
+% Exit-triggered switches are derived from the pre-placed pieces.
+array[1..N_ESWITCHES] of CELLS: ESWITCH_CELLS =
+  [ cell(INIT_POS[i].1, INIT_POS[i].2) | i in 1..N_INIT_POS where INIT_POS[i].3 in ESWITCHES_SET ];
+array[CELLS] of 0..N_ESWITCHES: eswitch_at = [
+  sum(es in 1..N_ESWITCHES where ESWITCH_CELLS[es] = p)(es) | p in CELLS ];
+
+% Pre-placed piece at each cell (EMPTY when the cell is free).
+array[CELLS] of Piece: init_piece = [
+  let { array[int] of Piece: ps = [ INIT_POS[i].3 | i in 1..N_INIT_POS where cell(INIT_POS[i].1, INIT_POS[i].2) = p ]; } in
+  if length(ps) > 0 then ps[1] else EMPTY endif
+| p in CELLS ];
 
 % ==== PRE-PLACED PIECE TRACKING ====
-% Boolean grid indicating which cells contain fixed, unmovable pieces.
-array[1..H, 1..W] of bool: cell_is_init =
-  array2d(1..H, 1..W, [ let { 
-    int: init_count = if N_INIT_POS = 0 then 0 else sum(i in 1..N_INIT_POS where INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)(1) endif;
-    int: tunnel_count = if N_TUNNELS = 0 then 0 else sum(i in 1..N_TUNNELS where (TUNNEL_PAIRS[i].1 = r /\ TUNNEL_PAIRS[i].2 = c) \/ (TUNNEL_PAIRS[i].4 = r /\ TUNNEL_PAIRS[i].5 = c))(1) endif;
-  } in init_count > 0 \/ tunnel_count > 0 | r in 1..H, c in 1..W ]);
+% Cells holding fixed pieces (INIT_POS entries or tunnel ends).
+array[1..H, 1..W] of bool: cell_is_init = array2d(1..H, 1..W, [
+  is_tunnel_cell[cell(r, c)] \/ exists(i in 1..N_INIT_POS)(INIT_POS[i].1 = r /\ INIT_POS[i].2 = c)
+| r in 1..H, c in 1..W ]);
 
 % ==== ROUTING PERMISSION TABLES ====
 % can_enter[p, d]: true if a train entering from direction d can enter piece p.
@@ -229,95 +228,18 @@ array[Piece, Dir] of Dir: exit_of = array2d(Piece, Dir, [
   TOP,   TOP,   TOP,   TOP    % ROCK
 ]);
 
-% ==== SWITCH TOGGLE MAPPINGS ====
-% dswitch_toggle[p]: Maps a DSWITCH to its toggled state counterpart.
-% When a train passes through a dswitch, it toggles to the mapped piece.
-array[Piece] of Piece: dswitch_toggle = [
-  EMPTY,         % EMPTY
-  STRAIGHT_TD,   % STRAIGHT_TD
-  STRAIGHT_RL,   % STRAIGHT_RL
-  CORNER_TR,     % CORNER_TR
-  CORNER_TL,     % CORNER_TL
-  CORNER_DR,     % CORNER_DR
-  CORNER_DL,     % CORNER_DL
-  SWITCH_T_D_R,  % SWITCH_T_D_R
-  SWITCH_T_D_L,  % SWITCH_T_D_L
-  SWITCH_D_T_R,  % SWITCH_D_T_R
-  SWITCH_D_T_L,  % SWITCH_D_T_L
-  SWITCH_R_L_T,  % SWITCH_R_L_T
-  SWITCH_R_L_D,  % SWITCH_R_L_D
-  SWITCH_L_R_T,  % SWITCH_L_R_T
-  SWITCH_L_R_D,  % SWITCH_L_R_D
-  DSWITCH_D_T_R, % DSWITCH_T_D_R -> DSWITCH_D_T_R
-  DSWITCH_D_T_L, % DSWITCH_T_D_L -> DSWITCH_D_T_L
-  DSWITCH_T_D_R, % DSWITCH_D_T_R -> DSWITCH_T_D_R
-  DSWITCH_T_D_L, % DSWITCH_D_T_L -> DSWITCH_T_D_L
-  DSWITCH_L_R_T, % DSWITCH_R_L_T -> DSWITCH_L_R_T
-  DSWITCH_L_R_D, % DSWITCH_R_L_D -> DSWITCH_L_R_D
-  DSWITCH_R_L_T, % DSWITCH_L_R_T -> DSWITCH_R_L_T
-  DSWITCH_R_L_D, % DSWITCH_L_R_D -> DSWITCH_R_L_D
-  ESWITCH_T_D_R, % ESWITCH_T_D_R
-  ESWITCH_T_D_L, % ESWITCH_T_D_L
-  ESWITCH_D_T_R, % ESWITCH_D_T_R
-  ESWITCH_D_T_L, % ESWITCH_D_T_L
-  ESWITCH_R_L_T, % ESWITCH_R_L_T
-  ESWITCH_R_L_D, % ESWITCH_R_L_D
-  ESWITCH_L_R_T, % ESWITCH_L_R_T
-  ESWITCH_L_R_D, % ESWITCH_L_R_D
-  TUNNEL_T,      % TUNNEL_T
-  TUNNEL_R,      % TUNNEL_R
-  TUNNEL_D,      % TUNNEL_D
-  TUNNEL_L,      % TUNNEL_L
-  ROCK           % ROCK
-];
-
-% eswitch_toggle[p]: Maps an ESWITCH to its toggled state counterpart.
-% When any train exits an eswitch, it toggles to the mapped piece.
-array[Piece] of Piece: eswitch_toggle = [
-  EMPTY,         % EMPTY
-  STRAIGHT_TD,   % STRAIGHT_TD
-  STRAIGHT_RL,   % STRAIGHT_RL
-  CORNER_TR,     % CORNER_TR
-  CORNER_TL,     % CORNER_TL
-  CORNER_DR,     % CORNER_DR
-  CORNER_DL,     % CORNER_DL
-  SWITCH_T_D_R,  % SWITCH_T_D_R
-  SWITCH_T_D_L,  % SWITCH_T_D_L
-  SWITCH_D_T_R,  % SWITCH_D_T_R
-  SWITCH_D_T_L,  % SWITCH_D_T_L
-  SWITCH_R_L_T,  % SWITCH_R_L_T
-  SWITCH_R_L_D,  % SWITCH_R_L_D
-  SWITCH_L_R_T,  % SWITCH_L_R_T
-  SWITCH_L_R_D,  % SWITCH_L_R_D
-  DSWITCH_T_D_R, % DSWITCH_T_D_R
-  DSWITCH_T_D_L, % DSWITCH_T_D_L
-  DSWITCH_D_T_R, % DSWITCH_D_T_R
-  DSWITCH_D_T_L, % DSWITCH_D_T_L
-  DSWITCH_R_L_T, % DSWITCH_R_L_T
-  DSWITCH_R_L_D, % DSWITCH_R_L_D
-  DSWITCH_L_R_T, % DSWITCH_L_R_T
-  DSWITCH_L_R_D, % DSWITCH_L_R_D
-  ESWITCH_D_T_R, % ESWITCH_T_D_R -> ESWITCH_D_T_R
-  ESWITCH_D_T_L, % ESWITCH_T_D_L -> ESWITCH_D_T_L
-  ESWITCH_T_D_R, % ESWITCH_D_T_R -> ESWITCH_T_D_R
-  ESWITCH_T_D_L, % ESWITCH_D_T_L -> ESWITCH_T_D_L
-  ESWITCH_L_R_T, % ESWITCH_R_L_T -> ESWITCH_L_R_T
-  ESWITCH_L_R_D, % ESWITCH_R_L_D -> ESWITCH_L_R_D
-  ESWITCH_R_L_T, % ESWITCH_L_R_T -> ESWITCH_R_L_T
-  ESWITCH_R_L_D, % ESWITCH_L_R_D -> ESWITCH_R_L_D
-  TUNNEL_T,      % TUNNEL_T
-  TUNNEL_R,      % TUNNEL_R
-  TUNNEL_D,      % TUNNEL_D
-  TUNNEL_L,      % TUNNEL_L
-  ROCK           % ROCK
-];
-
-% ==== HELPER FUNCTIONS ====
-% dswitch_effective_piece: Applies the current toggle state to get the actual piece routing.
-function var Piece: dswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
-  if toggled then dswitch_toggle[base_piece] else base_piece endif; % Returns toggled or original piece.
-
-% eswitch_effective_piece: Applies the current toggle state to get the actual piece routing.
-function var Piece: eswitch_effective_piece(var Piece: base_piece, var bool: toggled) =
-  if toggled then eswitch_toggle[base_piece] else base_piece endif; % Returns toggled or original piece.
-
+% ==== SWITCH TOGGLE MAPPING ====
+% switch_toggle[p]: the routing a stateful switch takes while toggled.  Dynamic
+% and exit-triggered switches swap their entry and straight-exit sides; every
+% other piece maps to itself.
+array[Piece] of Piece: switch_toggle = [
+  if p = DSWITCH_T_D_R then DSWITCH_D_T_R elseif p = DSWITCH_D_T_R then DSWITCH_T_D_R
+  elseif p = DSWITCH_T_D_L then DSWITCH_D_T_L elseif p = DSWITCH_D_T_L then DSWITCH_T_D_L
+  elseif p = DSWITCH_R_L_T then DSWITCH_L_R_T elseif p = DSWITCH_L_R_T then DSWITCH_R_L_T
+  elseif p = DSWITCH_R_L_D then DSWITCH_L_R_D elseif p = DSWITCH_L_R_D then DSWITCH_R_L_D
+  elseif p = ESWITCH_T_D_R then ESWITCH_D_T_R elseif p = ESWITCH_D_T_R then ESWITCH_T_D_R
+  elseif p = ESWITCH_T_D_L then ESWITCH_D_T_L elseif p = ESWITCH_D_T_L then ESWITCH_T_D_L
+  elseif p = ESWITCH_R_L_T then ESWITCH_L_R_T elseif p = ESWITCH_L_R_T then ESWITCH_R_L_T
+  elseif p = ESWITCH_R_L_D then ESWITCH_L_R_D elseif p = ESWITCH_L_R_D then ESWITCH_R_L_D
+  else p endif
+| p in Piece ];

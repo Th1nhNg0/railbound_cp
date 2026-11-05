@@ -51,20 +51,25 @@ This repository contains a MiniZinc-based solver for the puzzle game [Railbound]
 
 ## Repository Layout
 
-- `main.mzn` – Core MiniZinc model encoding the Railbound mechanics and objective.
-- `formatting.mzn` – Helper predicates for consistent board rendering when visualizing solutions.
-- `lib/` – Modular MiniZinc includes for movement rules, piece encodings, and shared constraints.
+- `main.mzn` – Entry point: input parameters, decision variables, and the shared per-cell state (effective switch routing, blocked cells).
+- `lib/types.mzn` – `Dir` / `Piece` enums and piece-category sets.
+- `lib/globals.mzn` – Parameter lookup tables (cell indexing, neighbours, tunnels, routing tables, switch toggles).
+- `constraints/` – One file per mechanic: grid, trains, decoys, activations, eswitches, semaphores, stations.
+- `formatting.mzn` – Solution output (board, track usage, and train/decoy paths).
 - `data/` – MiniZinc `.dzn` instances for each campaign puzzle currently modeled.
+- `convert_levels.py` – Converts the legacy `levels.json` dump into `.dzn` files.
 - `images/` – Static artwork shipped with the project (used in documentation).
 - `docs/` – Reference assets such as the cover image and gameplay animation embedded above.
 - `viz.html` – Lightweight viewer that turns solver output into an interactive grid.
-- `benchmark_results/` – Historical solver timing logs for different configurations.
-- `run_benchmarks.sh` – Convenience script to execute timed solver runs across multiple levels.
 - `project.mzp` – MiniZinc project file capturing IDE configuration for this workspace.
+
+### Encoding notes
+
+Board cells are addressed by a single row-major index `cell(r, c) = (r - 1) * W + c`, so each vehicle has one position variable per timestep. Collision, swap, station, and activation checks are single integer comparisons, and moving to the next cell (including tunnel teleports) is one lookup in the precomputed `move_cell` / `move_entry` tables. Switch toggles and gate/semaphore blocking are computed once per cell and timestep and shared by every train and decoy.
 
 ## Installation
 
-1. Install the latest [MiniZinc bundle](https://www.minizinc.org/software.html). It ships with the command-line tools, MiniZinc IDE, and the OR-Tools solver used in this project.
+1. Install the latest [MiniZinc bundle](https://www.minizinc.org/software.html). It ships with the command-line tools, the MiniZinc IDE, and the Chuffed and OR-Tools CP-SAT solvers.
 2. Clone the repository and ensure the `minizinc` executable is on your `PATH`.
    ```bash
    git clone https://github.com/your-user/railbound_cp.git
@@ -80,14 +85,14 @@ If you're crafting your own `.dzn` instances, see the data schema in [docs/data_
 - Choose a data file from `data/` (for example `data/8/8-1.dzn`).
 - Run MiniZinc with your preferred backend:
   ```bash
-  minizinc --solver or-tools main.mzn data/8/8-1.dzn
+  minizinc --solver chuffed main.mzn data/8/8-1.dzn
   ```
-- Review the textual solution output or post-process it with the tooling in `viz.html`.
+- The output shows the solved board, track usage, and each train's path as `(row,col)` cells. Add `--output-mode json` to get the raw decision variables (e.g. for `viz.html`).
 
 **MiniZinc IDE**
 
 - Launch the MiniZinc IDE and open `project.mzp`.
-- Select a solver configuration (OR-Tools works well) and click _Run_.
+- Select a solver configuration (Chuffed is the project default; OR-Tools CP-SAT also works well).
 - Press Run and choose a data file when prompted.
 
 ![Example visualization](docs/viz.gif)
