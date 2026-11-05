@@ -47,6 +47,12 @@ constraint forall(d in 1..N_DECOYS, time in 1..MAX_TIME-1) (
   endif
 );
 
+% ==== REACHABILITY PRUNING (redundant) ====
+% A decoy can only be on cells it can reach from its start in the elapsed time.
+constraint forall(d in 1..N_DECOYS, i in 1..MAX_TIME)(
+  decoy_pos[d, i] in { p | p in CELLS where decoy_dist_from_start[d, p] <= i }
+);
+
 % ==== DECOY-DECOY COLLISION PREVENTION ====
 % No two decoys occupy same cell at same time.
 constraint forall(d1 in 1..N_DECOYS, d2 in d1 + 1..N_DECOYS, i in 1..MAX_TIME)(

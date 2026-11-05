@@ -243,3 +243,55 @@ array[Piece] of Piece: switch_toggle = [
   elseif p = ESWITCH_R_L_D then ESWITCH_L_R_D elseif p = ESWITCH_L_R_D then ESWITCH_R_L_D
   else p endif
 | p in Piece ];
+
+% ==== REACHABILITY (shortest-path distances on the board) ====
+% A superset of every move any vehicle can ever make: from cell p a vehicle
+% may leave through any side (free cells) or through any side its fixed piece
+% can route to in either switch state, then lands on move_cell[p, e] if that
+% cell is not a rock and (when fixed) accepts entry from that side.  Shortest
+% paths in this graph are therefore valid lower bounds on travel time.
+function Piece: tunnel_piece(Dir: d) =
+  if d = TOP then TUNNEL_T elseif d = RIGHT then TUNNEL_R elseif d = DOWN then TUNNEL_D else TUNNEL_L endif;
+
+% fixed_piece[p]: piece fixed by the data (EMPTY marks a free cell).
+array[CELLS] of Piece: fixed_piece = [
+  if is_tunnel_cell[p] then
+    tunnel_piece(let { int: i = tunnel_pair_of[p]; } in
+      if cell(TUNNEL_PAIRS[i].1, TUNNEL_PAIRS[i].2) = p then TUNNEL_PAIRS[i].3 else TUNNEL_PAIRS[i].6 endif)
+  else init_piece[p] endif
+| p in CELLS ];
+
+array[CELLS] of set of Piece: piece_states = [
+  if fixed_piece[p] = EMPTY then PLACEABLE_SET diff {EMPTY}
+  else {fixed_piece[p], switch_toggle[fixed_piece[p]]} endif
+| p in CELLS ];
+
+array[CELLS, Dir] of bool: may_move = array2d(CELLS, Dir, [
+  let { int: q = move_cell[p, e]; } in
+  q > 0 /\ fixed_piece[p] != ROCK /\ fixed_piece[q] != ROCK /\
+  exists(x in piece_states[p], d in Dir)(exit_of[x, d] = e) /\
+  exists(x in piece_states[q])(can_enter[x, move_entry[p, e]])
+| p in CELLS, e in Dir ]);
+
+array[CELLS] of set of CELLS: succs = [ { move_cell[p, e] | e in Dir where may_move[p, e] } | p in CELLS ];
+array[CELLS] of set of CELLS: preds = [ { p | p in CELLS where q in succs[p] } | q in CELLS ];
+
+int: UNREACHABLE = N_CELLS + MAX_TIME + 1;
+
+% Bellman-Ford style relaxation to a fixpoint over the given neighbour sets.
+function array[CELLS] of int: relax_dist(array[CELLS] of int: d, array[CELLS] of set of CELLS: nb) =
+  let { array[CELLS] of int: d2 = [ min([d[q]] ++ [ d[n] + 1 | n in nb[q] ]) | q in CELLS ]; } in
+  if d2 = d then d else relax_dist(d2, nb) endif;
+
+% Distance from a vehicle start (row, col, heading): its first move is forced.
+function array[CELLS] of int: dist_from_start(int: r, int: c, Dir: d0) =
+  let { int: p0 = cell(r, c); int: p1 = nbr[p0, d0]; } in
+  relax_dist([ if p = p0 then 0 elseif p = p1 then 1 else UNREACHABLE endif | p in CELLS ], preds);
+
+array[1..N_TRAINS, CELLS] of int: train_dist_from_start = array2d(1..N_TRAINS, CELLS,
+  [ dist_from_start(TRAINS[t].1, TRAINS[t].2, TRAINS[t].3)[p] | t in 1..N_TRAINS, p in CELLS ]);
+array[1..N_DECOYS, CELLS] of int: decoy_dist_from_start = array2d(1..N_DECOYS, CELLS,
+  [ dist_from_start(DECOYS[d].1, DECOYS[d].2, DECOYS[d].3)[p] | d in 1..N_DECOYS, p in CELLS ]);
+% Distance from each cell to the target.
+array[CELLS] of int: dist_to_target =
+  relax_dist([ if p = TARGET_CELL then 0 else UNREACHABLE endif | p in CELLS ], succs);

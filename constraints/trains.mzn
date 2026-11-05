@@ -71,6 +71,22 @@ constraint if init_piece[TARGET_CELL] = STRAIGHT_RL /\ TARGET.2 = W /\
   )
 else true endif;
 
+% ==== REACHABILITY PRUNING (redundant) ====
+% A train can only be on cells it can reach from its start in the elapsed
+% time, and (before arriving) must still be able to reach the target in the
+% time it has left.  Waiting only delays a train, so these bounds are exact
+% consequences of the movement rules (see lib/globals.mzn).
+constraint forall(t in 1..N_TRAINS)(
+  let { int: latest = MAX_TIME - (N_TRAINS - t); } in
+  arrival_time[t] >= train_dist_from_start[t, TARGET_CELL] /\
+  forall(i in 1..MAX_TIME)(
+    train_pos[t, i] in { p | p in CELLS where
+      train_dist_from_start[t, p] <= i /\
+      (p = TARGET_CELL \/ dist_to_target[p] <= latest - i) } /\
+    (i < arrival_time[t] -> arrival_time[t] >= i + dist_to_target[train_pos[t, i]])
+  )
+);
+
 % ==== SEQUENTIAL ARRIVAL ====
 % Trains must arrive in order (train 1, then 2, etc.).
 constraint forall(t in 1..N_TRAINS) (
